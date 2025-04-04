@@ -47,23 +47,23 @@ static vector<Point> offsets = {
     {2, 1}
 };
 
-inline vector<Point> possibleMoves(const int row, const int col) {
-    vector<Point> result = vector<Point>();
-    result.reserve(6);
-    for (auto &offset: offsets) {
-        int potentialRow = offset.row + row;
-        int potentialCol = offset.col + col;
-        if (potentialRow >= 0 && potentialRow < 5 && potentialCol >= 0 && potentialCol < 6 && board[potentialRow][
-                potentialCol] == 0) {
-            result.push_back(Point{potentialRow, potentialCol});
-            // cout << potentialRow << ", " << potentialCol << endl;
-        }
-    }
-    return result;
-}
+// inline vector<Point> possibleMoves(const int row, const int col) {
+//     vector<Point> result = vector<Point>();
+//     result.reserve(6);
+//     for (auto &offset: offsets) {
+//         int potentialRow = offset.row + row;
+//         int potentialCol = offset.col + col;
+//         if (potentialRow >= 0 && potentialRow < 5 && potentialCol >= 0 && potentialCol < 6 && board[potentialRow][
+//                 potentialCol] == 0) {
+//             result.push_back(Point{potentialRow, potentialCol});
+//             // cout << potentialRow << ", " << potentialCol << endl;
+//         }
+//     }
+//     return result;
+// }
 
 inline vector<vector<int> > copy() {
-    vector<vector<int> > result = vector<vector<int> >(5, vector<int>(6));
+    auto result = vector<vector<int> >(5, vector<int>(6));
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 6; j++) {
             result[i][j] = board[i][j];
@@ -78,8 +78,14 @@ void simulate(const int row, const int col, const int num) {
         possibleSolutions.emplace_back(copy());
         cout << "Found one!" << endl;
     } else {
-        for (auto &possibleMove: possibleMoves(row, col)) {
-            simulate(possibleMove.row, possibleMove.col, num + 1);
+        for (auto &offset: offsets) {
+            int potentialRow = offset.row + row;
+            int potentialCol = offset.col + col;
+            if (potentialRow >= 0 && potentialRow < 5 &&
+                potentialCol >= 0 && potentialCol < 6 &&
+                board[potentialRow][potentialCol] == 0) {
+                simulate(potentialRow, potentialCol, num + 1);
+            }
         }
     }
     board[row][col] = 0;
