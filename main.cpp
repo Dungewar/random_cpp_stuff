@@ -16,16 +16,16 @@ void printBoard(const vector<vector<int> > &board) {
     }
 }
 
-int main() {
-    auto moves = allCompleteMoves();
-    for (int i = 0; i < moves.size(); i++) {
-        cout << "Solution #" << i + 1 << ":\n";
-        printBoard(moves.at(i));
-        cout << "\n";
-    }
-    flush(cout);
-    return 0;
-}
+// int main() {
+//     auto moves = allCompleteMoves();
+//     for (int i = 0; i < moves.size(); i++) {
+//         cout << "Solution #" << i + 1 << ":\n";
+//         printBoard(moves.at(i));
+//         cout << "\n";
+//     }
+//     flush(cout);
+//     return 0;
+// }
 
 struct Point {
     int row;
