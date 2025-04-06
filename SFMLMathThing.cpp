@@ -69,7 +69,7 @@ int main() {
         // sf::Time time = sf::Time::Zero;
         // sf::RectangleShape rect = sf::RectangleShape(1, 1);
 
-        double periodTime = (tickTimer.getElapsedTime().asMilliseconds() % CYCLE_TIME) / static_cast<double>(CYCLE_TIME)
+        double periodTime = (tickTimer.getElapsedTime().asMilliseconds()) / static_cast<double>(CYCLE_TIME)
                             * 2 * M_PI; // 2 seconds per cycle, mapped to values 0-2PI
 
         for (int yCount = 1; yCount <= 4; ++yCount) {
