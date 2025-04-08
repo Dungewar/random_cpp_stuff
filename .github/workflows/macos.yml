@@ -7,24 +7,27 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-macos:
     runs-on: macos-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Install SFML
         run: brew install sfml
 
-      - name: Configure CMake
+      - name: Configure build
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build the project
+      - name: Build project
         run: cmake --build build
 
       - name: Upload Executable
         uses: actions/upload-artifact@v4
         with:
-          - name: custom_testing-macos
-          - path: build/bin/custom_testing
+          name: custom_testing-macos
+          path: build/bin/custom_testing
 
   build-linux:
     runs-on: ubuntu-latest
