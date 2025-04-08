@@ -8,7 +8,7 @@
 #include <valarray>
 #include <SFML/Graphics.hpp>
 
-constexpr int CYCLE_TIME = 10000; // Time (in ms) per cycle
+int cycleTime = 10000; // Time (in ms) per cycle
 
 constexpr float CELL_SIZE = 150; // Size (width / height) of each parametric
 
@@ -16,9 +16,9 @@ constexpr float CELL_SPACING = 50; // Spacing in between each cell
 
 constexpr float PRECISION = 600; // Amount of shapes per parametric used to simulate it
 
-constexpr int COLUMNS = 8;
+constexpr int COLUMNS = 9;
 
-constexpr int ROWS = 4;
+constexpr int ROWS = 5;
 
 constexpr float MAX_SIZE = 5; // Maximum size of the pointer to the parametric equasion
 
@@ -38,6 +38,8 @@ auto trailHead = sf::CircleShape(MAX_SIZE, 6); // Things that draw the equasions
 auto vertLineTrail = sf::RectangleShape({MAX_SIZE, 100000});
 
 auto horizLineTrail = sf::RectangleShape({100000, MAX_SIZE});
+
+
 
 /**
  * Converts HSV values to a color
@@ -113,8 +115,7 @@ float stateSizeOfTrailHead(const int i) {
         return MAX_SIZE * (static_cast<float>(i) / PRECISION);
     } else if (t >= 5 && t <= 6) {
         return i == 0 ? MAX_SIZE : 1;
-    }
-    else
+    } else
         return MAX_SIZE;
 }
 
@@ -129,9 +130,16 @@ int main() {
     // Initialize things that don't change so no repeat
     sf::Text instructions(inriaSansFont);
     instructions.setPosition({0, 0});
-    instructions.setString("Hello");
+    instructions.setString("Hallo. Left and right arrows to switch modes, up and down to change speed, made by Olgierd Matusiewicz.");
     instructions.setOutlineColor(sf::Color::Black);
     instructions.setOutlineThickness(2);
+
+    sf::Text circleLabel(inriaSansFont);
+    circleLabel.setFillColor(sf::Color::White);
+    circleLabel.setOutlineColor(sf::Color::Black);
+    circleLabel.setOutlineThickness(2);
+
+    double periodTime = 0;
 
     while (window.isOpen()) {
         // Event handling
@@ -146,6 +154,13 @@ int main() {
                     case(sf::Keyboard::Key::Right):
                         if (state < 3) state++;
                         break;
+                    case(sf::Keyboard::Key::Up):
+                        cycleTime += 1000;
+                        break;
+                    case(sf::Keyboard::Key::Down):
+                        if (cycleTime-1000 > 0)
+                            cycleTime -= 1000;
+                        break;
                     default:
                         break;
                 }
@@ -157,17 +172,22 @@ int main() {
         // sf::Time time = sf::Time::Zero;
         // sf::RectangleShape rect = sf::RectangleShape(1, 1);
 
-        double periodTime = (tickTimer.getElapsedTime().asMilliseconds()) / static_cast<double>(CYCLE_TIME);
+        periodTime += static_cast<double>(tickTimer.restart().asMilliseconds()) / cycleTime;
+        // tickTimer.start();
         // 2 seconds per cycle, mapped to values 0-2PI
 
         for (int yCount = 1; yCount <= ROWS; ++yCount) {
             // Draw the left side circles
             for (int i = 0; i < static_cast<int>(PRECISION); i++) {
                 trailHead.setFillColor(decideOnColor(i * 360 / PRECISION));
-                trailHead.setPosition(parametricEquasion(periodTime + i / PRECISION, yCount, yCount, CELL_SIZE,
-                                                         (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET));
+                const sf::Vector2f &pos = parametricEquasion(periodTime + i / PRECISION, yCount, yCount, CELL_SIZE,
+                                                             (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET);
+                trailHead.setPosition(pos);
                 window.draw(trailHead);
             }
+            circleLabel.setPosition({CELL_SIZE, (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET});
+            circleLabel.setString(std::to_string(yCount));
+            window.draw(circleLabel);
 
             for (int xCount = 1; xCount <= COLUMNS; ++xCount) {
                 // Draw the main middle parametrics
@@ -192,6 +212,9 @@ int main() {
                                                                  CELL_SIZE));
                         window.draw(trailHead);
                     }
+                    circleLabel.setPosition({(CELL_SIZE + CELL_SPACING) * (xCount) + INIT_X_OFFSET, CELL_SIZE});
+                    circleLabel.setString(std::to_string(xCount));
+                    window.draw(circleLabel);
                     // Draw the lines to connect top-bottom
                     vertLineTrail.setPosition(parametricEquasion(periodTime, xCount, xCount,
                                                                  (CELL_SIZE + CELL_SPACING) * (xCount) + INIT_X_OFFSET,
@@ -206,7 +229,6 @@ int main() {
             horizLineTrail.setFillColor(decideOnColor(0));
             window.draw(horizLineTrail);
         }
-
 
 
         window.draw(instructions);
