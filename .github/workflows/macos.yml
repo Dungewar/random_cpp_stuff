@@ -1,20 +1,26 @@
-name: Build macOS app
+name: Build macOS App
 
 on: [push, pull_request]
 
 jobs:
-  build:
+  build-macos:
     runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Install SFML
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
         run: brew install sfml
-      - name: Configure
+
+      - name: Configure build
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
       - name: Build
         run: cmake --build build
+
       - name: Upload binary
         uses: actions/upload-artifact@v3
         with:
-          name: myapp-macos
-          path: build/myapp
+          name: my-sfml-app-macos
+          path: build/my_app
