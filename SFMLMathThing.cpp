@@ -7,6 +7,7 @@
 #include <iostream>
 #include <valarray>
 #include <SFML/Graphics.hpp>
+#include "font_data.h"
 
 int cycleTime = 10000; // Time (in ms) per cycle
 
@@ -125,7 +126,7 @@ int main() {
     window.setVerticalSyncEnabled(true);
     sf::Clock tickTimer = sf::Clock();
 
-    sf::Font inriaSansFont("resources/InriaSans-Regular.ttf");
+    sf::Font inriaSansFont(resources_InriaSans_Regular_ttf, resources_InriaSans_Regular_ttf_len);
 
     // Initialize things that don't change so no repeat
     sf::Text instructions(inriaSansFont);

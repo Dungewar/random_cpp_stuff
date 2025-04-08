@@ -20,10 +20,12 @@ add_executable(
     custom_testing    main.cpp
         SFMLMathThing.cpp
         SFMLMathThing.h
+        font_data.cpp
+        font_data.h
 )
 
-# Copy the 'resources' folder into the build directory
-file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
+## Copy the 'resources' folder into the build directory
+#file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
 # Link to SFML 3.x modern targets
 target_link_libraries(custom_testing PRIVATE
