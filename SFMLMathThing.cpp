@@ -162,7 +162,7 @@ int main() {
 
         for (int yCount = 1; yCount <= ROWS; ++yCount) {
             // Draw the left side circles
-            for (int i = 0; i < PRECISION; i++) {
+            for (int i = 0; i < static_cast<int>(PRECISION); i++) {
                 trailHead.setFillColor(decideOnColor(i * 360 / PRECISION));
                 trailHead.setPosition(parametricEquasion(periodTime + i / PRECISION, yCount, yCount, CELL_SIZE,
                                                          (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET));
