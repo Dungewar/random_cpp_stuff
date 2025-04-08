@@ -28,3 +28,25 @@ jobs:
         with:
           name: custom_testing-macos
           path: build/bin/custom_testing
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install SFML
+        run: sudo apt-get update && sudo apt-get install -y libsfml-dev cmake g++
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build the project
+        run: cmake --build build
+
+      - name: Upload Executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: custom_testing-linux
+          path: build/bin/custom_testing
