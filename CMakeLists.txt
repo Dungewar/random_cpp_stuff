@@ -23,7 +23,7 @@ add_executable(
 )
 
 # Copy the 'resources' folder into the build directory
-#file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
 # Link to SFML 3.x modern targets
 target_link_libraries(custom_testing PRIVATE

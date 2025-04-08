@@ -8,13 +8,36 @@
 #include <valarray>
 #include <SFML/Graphics.hpp>
 
-constexpr int CYCLE_TIME = 2000;
+constexpr int CYCLE_TIME = 10000; // Time (in ms) per cycle
 
-constexpr double CELL_SIZE = 50;
+constexpr float CELL_SIZE = 150; // Size (width / height) of each parametric
 
-constexpr double PRECISION = 400;
+constexpr float CELL_SPACING = 50; // Spacing in between each cell
 
-double MAX_SIZE = 3;
+constexpr float PRECISION = 600; // Amount of shapes per parametric used to simulate it
+
+constexpr int COLUMNS = 8;
+
+constexpr int ROWS = 4;
+
+constexpr float MAX_SIZE = 5; // Maximum size of the pointer to the parametric equasion
+
+constexpr float INIT_X_OFFSET = 150; // Offset to the start of the parametrics
+
+constexpr float INIT_Y_OFFSET = 150; // Offset to the start of the parametrics
+
+// Important: the state of the program, AKA what it's doing
+// 0 is base rainbow state
+// 1 is fading black state
+// 2 is fading rainbow state
+// 3 is regular black state
+int state = 0;
+
+auto trailHead = sf::CircleShape(MAX_SIZE, 6); // Things that draw the equasions, can be rect or circle
+
+auto vertLineTrail = sf::RectangleShape({MAX_SIZE, 100000});
+
+auto horizLineTrail = sf::RectangleShape({100000, MAX_SIZE});
 
 /**
  * Converts HSV values to a color
@@ -31,17 +54,29 @@ sf::Color hsvToRgb(double h, double s, double v) {
     float rPrime, gPrime, bPrime;
 
     if (h >= 0 && h < 60) {
-        rPrime = c; gPrime = x; bPrime = 0;
+        rPrime = c;
+        gPrime = x;
+        bPrime = 0;
     } else if (h >= 60 && h < 120) {
-        rPrime = x; gPrime = c; bPrime = 0;
+        rPrime = x;
+        gPrime = c;
+        bPrime = 0;
     } else if (h >= 120 && h < 180) {
-        rPrime = 0; gPrime = c; bPrime = x;
+        rPrime = 0;
+        gPrime = c;
+        bPrime = x;
     } else if (h >= 180 && h < 240) {
-        rPrime = 0; gPrime = x; bPrime = c;
+        rPrime = 0;
+        gPrime = x;
+        bPrime = c;
     } else if (h >= 240 && h < 300) {
-        rPrime = x; gPrime = 0; bPrime = c;
+        rPrime = x;
+        gPrime = 0;
+        bPrime = c;
     } else {
-        rPrime = c; gPrime = 0; bPrime = x;
+        rPrime = c;
+        gPrime = 0;
+        bPrime = x;
     }
 
     auto r = static_cast<std::uint8_t>((rPrime + m) * 255);
@@ -50,17 +85,70 @@ sf::Color hsvToRgb(double h, double s, double v) {
     return {r, g, b};
 }
 
+/**
+ * Calculates a certain parametric equation
+ * @param time The time, which acts like a base offset to the function, shifting everything over
+ * @param yOscilations Amount of vertical oscillations per 2PI
+ * @param xOscilations Amount of horizontal oscillations per 2PI
+ * @return The position of the trail
+ */
+sf::Vector2f parametricEquasion(double time, int xOscilations, int yOscilations, double xOffset, double yOffset) {
+    return {
+        static_cast<float>(std::cos(time * 2 * M_PI * xOscilations) * CELL_SIZE / 2 + xOffset),
+        static_cast<float>(std::sin(time * 2 * M_PI * yOscilations) * CELL_SIZE / 2 + yOffset)
+    };
+}
+
+sf::Color decideOnColor(double x) {
+    if (state % 2 == 0)
+        return hsvToRgb(x, 1, 1);
+    else
+        return sf::Color::Black;
+}
+
+float stateSizeOfTrailHead(const int i) {
+    int t = state % 8;
+    if (t >= 2 && t <= 3) {
+        // std::cout << MAX_SIZE * (static_cast<float>(i) / PRECISION) << std::endl;
+        return MAX_SIZE * (static_cast<float>(i) / PRECISION);
+    } else if (t >= 5 && t <= 6) {
+        return i == 0 ? MAX_SIZE : 1;
+    }
+    else
+        return MAX_SIZE;
+}
+
 int main() {
-    sf::RenderWindow window(sf::VideoMode(sf::Vector2u(CELL_SIZE*27, CELL_SIZE*15)), "SFML Window");
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u(CELL_SIZE * 27, CELL_SIZE * 15)), "SFML Window");
     // VSYNC IMPORTANT - otherwise 9000 updates a second and bad for shit
     window.setVerticalSyncEnabled(true);
     sf::Clock tickTimer = sf::Clock();
+
+    sf::Font inriaSansFont("resources/InriaSans-Regular.ttf");
+
+    // Initialize things that don't change so no repeat
+    sf::Text instructions(inriaSansFont);
+    instructions.setPosition({0, 0});
+    instructions.setString("Hello");
+    instructions.setOutlineColor(sf::Color::Black);
+    instructions.setOutlineThickness(2);
 
     while (window.isOpen()) {
         // Event handling
         while (const auto &event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
+            } else if (const auto *keyPressedEvent = event->getIf<sf::Event::KeyPressed>()) {
+                switch (keyPressedEvent->code) {
+                    case(sf::Keyboard::Key::Left):
+                        if (state > 0) state--;
+                        break;
+                    case(sf::Keyboard::Key::Right):
+                        if (state < 3) state++;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -69,24 +157,59 @@ int main() {
         // sf::Time time = sf::Time::Zero;
         // sf::RectangleShape rect = sf::RectangleShape(1, 1);
 
-        double periodTime = (tickTimer.getElapsedTime().asMilliseconds()) / static_cast<double>(CYCLE_TIME)
-                            * 2 * M_PI; // 2 seconds per cycle, mapped to values 0-2PI
+        double periodTime = (tickTimer.getElapsedTime().asMilliseconds()) / static_cast<double>(CYCLE_TIME);
+        // 2 seconds per cycle, mapped to values 0-2PI
 
-        for (int yCount = 1; yCount <= 4; ++yCount) {
-            for (int xCount = 1; xCount <= 8; ++xCount) {
-                for (int i = 0; i < PRECISION; i++) {
-                    sf::CircleShape trailHead = sf::CircleShape(MAX_SIZE);
-                    // sf::CircleShape trailHead = sf::CircleShape(i / PRECISION * MAX_SIZE);
-                    trailHead.setFillColor(hsvToRgb(i*360/PRECISION, 1, 1));
-                    trailHead.setPosition(sf::Vector2f(
-                        std::cos((periodTime + i / PRECISION * 2 * M_PI) * xCount) * CELL_SIZE + CELL_SIZE * xCount * 3,
-                        std::sin((periodTime + i / PRECISION * 2 * M_PI) * yCount) * CELL_SIZE + CELL_SIZE * yCount *
-                        3));
+        for (int yCount = 1; yCount <= ROWS; ++yCount) {
+            // Draw the left side circles
+            for (int i = 0; i < PRECISION; i++) {
+                trailHead.setFillColor(decideOnColor(i * 360 / PRECISION));
+                trailHead.setPosition(parametricEquasion(periodTime + i / PRECISION, yCount, yCount, CELL_SIZE,
+                                                         (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET));
+                window.draw(trailHead);
+            }
+
+            for (int xCount = 1; xCount <= COLUMNS; ++xCount) {
+                // Draw the main middle parametrics
+                for (int i = 0; i < PRECISION; i += 1) {
+                    trailHead.setFillColor(decideOnColor(i * 360 / PRECISION));
+                    trailHead.setRadius(stateSizeOfTrailHead(i));
+                    trailHead.setPosition(parametricEquasion(
+                        periodTime + i / PRECISION,
+                        xCount,
+                        yCount,
+                        (CELL_SIZE + CELL_SPACING) * (xCount) + INIT_X_OFFSET,
+                        (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET));
                     window.draw(trailHead);
                 }
+                // We only want to do this once
+                if (yCount == 1) {
+                    // Draw the top circles
+                    for (int i = 0; i < PRECISION; i++) {
+                        trailHead.setFillColor(decideOnColor(i * 360 / PRECISION));
+                        trailHead.setPosition(parametricEquasion(periodTime + i / PRECISION, xCount, xCount,
+                                                                 (CELL_SIZE + CELL_SPACING) * (xCount) + INIT_X_OFFSET,
+                                                                 CELL_SIZE));
+                        window.draw(trailHead);
+                    }
+                    // Draw the lines to connect top-bottom
+                    vertLineTrail.setPosition(parametricEquasion(periodTime, xCount, xCount,
+                                                                 (CELL_SIZE + CELL_SPACING) * (xCount) + INIT_X_OFFSET,
+                                                                 CELL_SIZE));
+                    vertLineTrail.setFillColor(decideOnColor(0));
+                    window.draw(vertLineTrail);
+                }
             }
+            // Draw the lines to connect left-right
+            horizLineTrail.setPosition(parametricEquasion(periodTime, yCount, yCount, CELL_SIZE,
+                                                          (CELL_SIZE + CELL_SPACING) * (yCount) + INIT_Y_OFFSET));
+            horizLineTrail.setFillColor(decideOnColor(0));
+            window.draw(horizLineTrail);
         }
 
+
+
+        window.draw(instructions);
 
         // Display changes to window
         window.display();
