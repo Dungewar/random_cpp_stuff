@@ -12,7 +12,17 @@ if(WIN32)
 endif()
 
 
-set(SFML_STATIC_LIBRARIES TRUE)
+if(APPLE)
+    message(STATUS "macOS detected, using dynamic SFML libraries")
+    set(SFML_STATIC_LIBRARIES FALSE)
+elseif(LINUX)
+    message(STATUS "linux detected, using static SFML libraries")
+    set(SFML_STATIC_LIBRARIES TRUE)
+elseif(WIN32)
+    message(STATUS "windows detected, using static SFML libraries")
+    set(SFML_STATIC_LIBRARIES TRUE)
+endif()
+
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System Audio)
 
 # Add the executable

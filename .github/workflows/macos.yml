@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install SFML
         run: brew install sfml
@@ -46,7 +46,7 @@ jobs:
         run: cmake --build build
 
       - name: Upload Executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: custom_testing-linux
           path: build/bin/custom_testing
