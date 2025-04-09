@@ -5,7 +5,7 @@ on:
     branches: [ release ]
   pull_request:
     branches: [ release ]
-
+  x
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -101,12 +101,19 @@ jobs:
       - name: Install CMake + deps (if needed)
         run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
 
+      - name: Install FreeType and dependencies
+        run: choco install freetype --yes
+
       - name: Build and install SFML from source (static)
         run: |
           git clone --branch 3.0.0 https://github.com/SFML/SFML.git
           mkdir SFML\build
           cd SFML\build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\SFML\install
+          cmake .. -DCMAKE_BUILD_TYPE=Release ^
+                   -DBUILD_SHARED_LIBS=OFF ^
+                   -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\SFML\install ^
+                   -DSFML_USE_SYSTEM_FREETYPE=ON
+                   -DSFML_BUILD_AUDIO=OFF
           cmake --build . --config Release
           cmake --install . --config Release
 
