@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom_testing-macos
-          path: build/bin/custom_testing
+          path: build/**
 
   build-linux:
     runs-on: ubuntu-latest
@@ -90,4 +90,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom_testing-linux
-          path: build/bin/custom_testing
+          path: build/**
