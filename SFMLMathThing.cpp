@@ -155,10 +155,10 @@ int main() {
                     case(sf::Keyboard::Key::Right):
                         if (state < 3) state++;
                         break;
-                    case(sf::Keyboard::Key::Up):
+                    case(sf::Keyboard::Key::Down):
                         cycleTime += 1000;
                         break;
-                    case(sf::Keyboard::Key::Down):
+                    case(sf::Keyboard::Key::Up):
                         if (cycleTime-1000 > 0)
                             cycleTime -= 1000;
                         break;

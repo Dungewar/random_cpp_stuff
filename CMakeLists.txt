@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # Needed for static linking sometimes
 
 # Point to custom-built SFML
-set(SFML_DIR "${CMAKE_SOURCE_DIR}/SFML/build")  # This will match GitHub Actions folder
+set(SFML_DIR "$ENV{HOME}/sfml-install/lib/cmake/SFML")
 
 # Add your executable
 add_executable(custom_testing
@@ -17,8 +17,11 @@ add_executable(custom_testing
         font_data.h
 )
 
-# Link SFML
+set(SFML_STATIC_LIBRARIES TRUE)
+set(BUILD_SHARED_LIBS OFF)       # good to include
+set(SFML_DIR "/usr/local/lib/cmake/SFML")  # or your custom-built path
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System Audio)
+
 target_link_libraries(custom_testing PRIVATE
         SFML::Graphics
         SFML::Window
