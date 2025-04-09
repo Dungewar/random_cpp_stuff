@@ -6,11 +6,21 @@ on:
   pull_request:
     branches: [ master ]
 
+
+
 jobs:
+
   build-macos:
     runs-on: macos-latest
 
     steps:
+      - name: Build SFML from source (static)
+        run: |
+          git clone --depth 1 https://github.com/SFML/SFML.git
+          mkdir SFML/build && cd SFML/build
+          cmake .. -DSFML_BUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+
       - name: Checkout code
         uses: actions/checkout@v4
 

@@ -12,16 +12,18 @@ if(WIN32)
 endif()
 
 
-if(APPLE)
-    message(STATUS "macOS detected, using dynamic SFML libraries")
-    set(SFML_STATIC_LIBRARIES FALSE)
-elseif(LINUX)
-    message(STATUS "linux detected, using static SFML libraries")
-    set(SFML_STATIC_LIBRARIES TRUE)
-elseif(WIN32)
-    message(STATUS "windows detected, using static SFML libraries")
-    set(SFML_STATIC_LIBRARIES TRUE)
-endif()
+#if(APPLE)
+#    message(STATUS "macOS detected, using dynamic SFML libraries")
+#    set(SFML_STATIC_LIBRARIES FALSE)
+#elseif(LINUX)
+#    message(STATUS "linux detected, using static SFML libraries")
+#    set(SFML_STATIC_LIBRARIES TRUE)
+#elseif(WIN32)
+#    message(STATUS "windows detected, using static SFML libraries")
+#    set(SFML_STATIC_LIBRARIES TRUE)
+#endif()
+
+set(SFML_DIR "${CMAKE_SOURCE_DIR}/SFML/build")
 
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System Audio)
 
