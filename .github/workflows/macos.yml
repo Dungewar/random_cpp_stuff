@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom_testing-macos
-          path: build/**
+          path: build/custom_testing
 
   build-linux:
     runs-on: ubuntu-latest
@@ -90,4 +90,37 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom_testing-linux
-          path: build/**
+          path: build/custom_testing
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install CMake + deps (if needed)
+        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
+
+      - name: Build and install SFML from source (static)
+        run: |
+          git clone --branch 3.0.0 https://github.com/SFML/SFML.git
+          mkdir SFML\build
+          cd SFML\build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\SFML\install
+          cmake --build . --config Release
+          cmake --install . --config Release
+
+      - name: Show SFML install tree
+        run: dir ${{ github.workspace }}\SFML\install /s
+
+      - name: Configure project build
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSFML_DIR="${{ github.workspace }}\SFML\install\lib\cmake\SFML"
+
+      - name: Build project
+        run: cmake --build build --config Release
+
+      - name: Upload Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom_testing-windows
+          path: build\Release\custom_testing.exe

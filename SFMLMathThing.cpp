@@ -40,6 +40,7 @@ auto vertLineTrail = sf::RectangleShape({MAX_SIZE, 100000});
 
 auto horizLineTrail = sf::RectangleShape({100000, MAX_SIZE});
 
+float scale = 0.005;
 
 
 /**
@@ -121,7 +122,12 @@ float stateSizeOfTrailHead(const int i) {
 }
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(sf::Vector2u(CELL_SIZE * 27, CELL_SIZE * 15)), "SFML Window");
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u(CELL_SIZE * COLUMNS, CELL_SIZE * ROWS)), "SFML Window");
+
+    sf::View view(sf::FloatRect({0, 0}, {COLUMNS / scale, ROWS / scale}));
+
+    window.setView(view);
+
     // VSYNC IMPORTANT - otherwise 9000 updates a second and bad for shit
     window.setVerticalSyncEnabled(true);
     sf::Clock tickTimer = sf::Clock();
@@ -131,7 +137,8 @@ int main() {
     // Initialize things that don't change so no repeat
     sf::Text instructions(inriaSansFont);
     instructions.setPosition({0, 0});
-    instructions.setString("Hallo. Left and right arrows to switch modes, up and down to change speed, made by Olgierd Matusiewicz.");
+    instructions.setString(
+        "P/M to change size. Left and right arrows to switch modes, up and down to change speed, made by Olgierd Matusiewicz.");
     instructions.setOutlineColor(sf::Color::Black);
     instructions.setOutlineThickness(2);
 
@@ -143,7 +150,7 @@ int main() {
     double periodTime = 0;
 
     while (window.isOpen()) {
-        // Event handling
+        // ------------------ Event handling ------------------
         while (const auto &event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
@@ -159,9 +166,18 @@ int main() {
                         cycleTime += 1000;
                         break;
                     case(sf::Keyboard::Key::Up):
-                        if (cycleTime-1000 > 0)
+                        if (cycleTime - 1000 > 0)
                             cycleTime -= 1000;
                         break;
+                    case(sf::Keyboard::Key::M):
+                        scale += 0.0005;
+                        window.setView(sf::View(sf::FloatRect({0, 0}, {COLUMNS / scale, ROWS / scale})));
+                        break;
+                    case(sf::Keyboard::Key::P):
+                        scale -= 0.0005;
+                        window.setView(sf::View(sf::FloatRect({0, 0}, {COLUMNS / scale, ROWS / scale})));
+                        break;
+
                     default:
                         break;
                 }
