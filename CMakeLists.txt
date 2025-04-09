@@ -15,7 +15,7 @@ set(BUILD_SHARED_LIBS OFF)
 set(SFML_STATIC_LIBRARIES TRUE)
 
 # Find SFML
-find_package(SFML REQUIRED COMPONENTS Graphics Window System Audio)
+find_package(SFML REQUIRED COMPONENTS Graphics Window System)
 
 # Build executable
 add_executable(custom_testing
@@ -30,7 +30,6 @@ target_link_libraries(custom_testing PRIVATE
         SFML::Graphics
         SFML::Window
         SFML::System
-        SFML::Audio
 )
 
 # Output binary in bin/
