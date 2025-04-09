@@ -1,14 +1,23 @@
 cmake_minimum_required(VERSION 3.14)
 project(custom_testing)
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Use SFML 3 static build from source
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # Needed for static linking sometimes
+# NOTE: Do NOT hardcode SFML_DIR here.
+# Instead, pass it in from the command line via -DSFML_DIR=...
+# That way it works for GitHub Actions, macOS, Linux, etc.
 
-# Point to custom-built SFML
-set(SFML_DIR "$ENV{HOME}/sfml-install/lib/cmake/SFML")
+# Optional: Help CMake find SFML
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${SFML_DIR}")
 
-# Add your executable
+# Use static libraries
+set(BUILD_SHARED_LIBS OFF)
+set(SFML_STATIC_LIBRARIES TRUE)
+
+# Find SFML
+find_package(SFML REQUIRED COMPONENTS Graphics Window System Audio)
+
+# Build executable
 add_executable(custom_testing
         main.cpp
         SFMLMathThing.cpp
@@ -17,11 +26,6 @@ add_executable(custom_testing
         font_data.h
 )
 
-set(SFML_STATIC_LIBRARIES TRUE)
-set(BUILD_SHARED_LIBS OFF)       # good to include
-set(SFML_DIR "/usr/local/lib/cmake/SFML")  # or your custom-built path
-find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System Audio)
-
 target_link_libraries(custom_testing PRIVATE
         SFML::Graphics
         SFML::Window
@@ -29,5 +33,5 @@ target_link_libraries(custom_testing PRIVATE
         SFML::Audio
 )
 
-# Optional: Put output in bin/
+# Output binary in bin/
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
