@@ -1,4 +1,4 @@
-name: Build SFML App on macOS
+name: Build SFML App on macOS and Linux
 
 on:
   push:
@@ -7,38 +7,37 @@ on:
     branches: [ release ]
 
 jobs:
-  jobs:
-    build-macos:
-      runs-on: macos-latest
+  build-macos:
+    runs-on: macos-latest
 
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        - name: Build and install SFML from source (static)
-          run: |
-            git clone --branch 3.0.0 https://github.com/SFML/SFML.git
-            mkdir SFML/build && cd SFML/build
-            cmake .. -DCMAKE_BUILD_TYPE=Release \
-                     -DBUILD_SHARED_LIBS=OFF \
-                     -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/SFML/install
-            cmake --build . --config Release
-            cmake --install .
+      - name: Build and install SFML from source (static)
+        run: |
+          git clone --branch 3.0.0 https://github.com/SFML/SFML.git
+          mkdir SFML/build && cd SFML/build
+          cmake .. -DCMAKE_BUILD_TYPE=Release \
+                   -DBUILD_SHARED_LIBS=OFF \
+                   -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/SFML/install
+          cmake --build . --config Release
+          cmake --install .
 
-        - name: Debug install output
-          run: ls -R ${{ github.workspace }}/SFML/install/lib/cmake/SFML
+      - name: Debug install output
+        run: ls -R ${{ github.workspace }}/SFML/install/lib/cmake/SFML
 
-        - name: Configure project build
-          run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSFML_DIR=${{ github.workspace }}/SFML/install/lib/cmake/SFML
+      - name: Configure project build
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSFML_DIR=${{ github.workspace }}/SFML/install/lib/cmake/SFML
 
-        - name: Build project
-          run: cmake --build build
+      - name: Build project
+        run: cmake --build build
 
-        - name: Upload Executable
-          uses: actions/upload-artifact@v4
-          with:
-            name: custom_testing-macos
-            path: build/bin/custom_testing
+      - name: Upload Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom_testing-macos
+          path: build/bin/custom_testing
 
   build-linux:
     runs-on: ubuntu-latest
@@ -69,7 +68,9 @@ jobs:
         run: |
           git clone --branch 3.0.0 https://github.com/SFML/SFML.git
           mkdir SFML/build && cd SFML/build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/SFML/install
+          cmake .. -DCMAKE_BUILD_TYPE=Release \
+                   -DBUILD_SHARED_LIBS=OFF \
+                   -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/SFML/install
           cmake --build . --config Release
           cmake --install .
 
