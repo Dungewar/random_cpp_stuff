@@ -5,8 +5,6 @@ on:
     branches: [ release ]
   pull_request:
     branches: [ release ]
-  merge:
-    branches: [ release ]
 
 jobs:
   build-macos:
