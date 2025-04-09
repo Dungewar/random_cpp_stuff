@@ -24,6 +24,12 @@ jobs:
           cmake --build . --config Release
           cmake --install .
 
+      - name: Show full SFML install tree
+        run: |
+          echo "=== SFML Install Tree ==="
+          find ${{ github.workspace }}/SFML/install
+          echo "=========================="
+
       - name: Debug install output
         run: ls -R ${{ github.workspace }}/SFML/install/lib/cmake/SFML
 
