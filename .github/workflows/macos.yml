@@ -97,22 +97,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install CMake + deps (if needed)
+      - name: Install CMake
         run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
 
-      - name: Install FreeType and dependencies
-        run: choco install freetype --yes
+      - name: Install FreeType via vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg install freetype
 
       - name: Build and install SFML from source (static)
         run: |
           git clone --branch 3.0.0 https://github.com/SFML/SFML.git
           mkdir SFML\build
           cd SFML\build
-          cmake .. -DCMAKE_BUILD_TYPE=Release ^
-                   -DBUILD_SHARED_LIBS=OFF ^
-                   -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\SFML\install ^
-                   -DSFML_USE_SYSTEM_FREETYPE=ON
-                   -DSFML_BUILD_AUDIO=OFF
+          cmake .. `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DSFML_USE_SYSTEM_FREETYPE=ON `
+            -DSFML_BUILD_AUDIO=OFF `
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\SFML\install
           cmake --build . --config Release
           cmake --install . --config Release
 
@@ -120,7 +125,11 @@ jobs:
         run: dir ${{ github.workspace }}\SFML\install /s
 
       - name: Configure project build
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSFML_DIR="${{ github.workspace }}\SFML\install\lib\cmake\SFML"
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DSFML_DIR="${{ github.workspace }}\SFML\install\lib\cmake\SFML" `
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
 
       - name: Build project
         run: cmake --build build --config Release
