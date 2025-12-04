@@ -1,0 +1,3 @@
+/home/dungewar/CLionProjects/random_cpp_stuff/cmake-build-debug/CMakeFiles/custom_testing.dir
+/home/dungewar/CLionProjects/random_cpp_stuff/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/dungewar/CLionProjects/random_cpp_stuff/cmake-build-debug/CMakeFiles/rebuild_cache.dir

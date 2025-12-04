@@ -1,0 +1,7 @@
+# ninja log v6
+6	1408	1744233062335064473	CMakeFiles/custom_testing.dir/main.cpp.o	ea160dc235987809
+3772	4067	1744238155643758557	custom_testing	504c5e0d5d4f6fe4
+3	3772	1744238151874682950	CMakeFiles/custom_testing.dir/SFMLMathThing.cpp.o	d0427223d8497ac
+1	116	1745601675027973001	build.ninja	7ab02efbd1cdc8d5
+7	182	1744233062336064357	CMakeFiles/custom_testing.dir/font_data.cpp.o	2d9005eb7fa93b24
+4	215	1744145821563146456	bin/custom_testing	884f6faa43f9d4aa
