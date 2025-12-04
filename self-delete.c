@@ -1,13 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+// #define FILENAME = "runme";
 
 int main()
 {
+    const char *FILENAME = "runme";
     FILE *filePointer;
-    filePointer = fopen("input.txt", "r");
+    filePointer = fopen(FILENAME, "r");
     if (filePointer == NULL)
     {
-        printf("Rename this file to 'runme'");
+        // char *message = malloc(100);
+        // message = ;
+        // stdout << "Rename this file to ";
+        printf("Rename this file to %s", FILENAME);
         return 1;
     }
     fseek(filePointer, 0, SEEK_END);
@@ -23,22 +30,28 @@ int main()
 
     printf("%s", buffer);
 
-    if (remove("input.txt") == 0)
+    if (remove(FILENAME) == 0)
     {
-        printf("Deleted successfully. The only way that you can stop your files from being permamently deleted is if you play this game. I am holding your entire home directory for ransom. If you close the program prematurely, it will delete a *random* file from it.\n");
+        printf("Deleted successfully. The only way that you can stop your files from being permamently deleted is if you play this game. I am holding your entire home directory for ransom. If you close the program prematurely, it will delete a \033[31mrandom\033[0m file from it.\n");
     }
     else
     {
-        printf("Unable to delete the file\n");
+        printf("Error: UD\n");
+        return 1;
     }
 
     char *input;
-    input = (char *)malloc(100 * sizeof(char));
-    printf("Type anything to continue: ");
-    fgets(input, 100, stdin);
+    input = (char *)malloc(11 * sizeof(char));
+    while (strcmp(input, "I consent\n") != 0)
+    {
+        printf("Type \"I consent\" to continue: ");
+        fgets(input, 11, stdin);
+        printf("%s", input);
+    }
+    printf("Thanks for consenting\n");
 
     FILE *fileWritePointer;
-    fileWritePointer = fopen("input.txt", "w");
+    fileWritePointer = fopen(FILENAME, "w");
     if (fileWritePointer == NULL)
     {
         printf("Error opening file for writing.\n");
