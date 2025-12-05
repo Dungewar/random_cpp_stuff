@@ -37,6 +37,9 @@ Rule allUpper(char *msg)
     base.valid = true;
     return base;
 }
+OperationFunc allRules[] = {
+    allUpper,
+};
 
 int main()
 {
@@ -44,7 +47,8 @@ int main()
 
     // ------------------ TESTING -----------------------
 
-    printf("cheese->%d, CHEESe->%d, CHEESE->%d", allUpper("cheese").valid, allUpper("CHEESe").valid, allUpper("CHEESE").valid);
+    printf("1 = true, 0 = false");
+    printf("allUpper: cheese->%d, CHEESe->%d, CHEESE->%d\n", allUpper("cheese").valid, allUpper("CHEESe").valid, allUpper("CHEESE").valid);
 
     return 0;
     // ------------------ TESTING -----------------------
