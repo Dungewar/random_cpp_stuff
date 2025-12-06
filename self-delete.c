@@ -6,13 +6,16 @@
 #include <sys/stat.h> // Needed for mkdir
 #include <errno.h>    // Needed for errno
 #include <stdbool.h>
+#include <ctype.h>
 
 #define MAX_PATH_LEN 1024
+#define DEBUG true
 // #define FILENAME = "runme"
 
 typedef struct
 {
     const char *message;
+    const char *name;
     bool valid;
 } Rule;
 
@@ -22,12 +25,13 @@ Rule allUpper(char *msg)
 {
     Rule base;
     base.message = "Lowercase letters are BANNED.\n";
+    base.name = "All Uppercase";
 
     int i = 0;
     while (msg[i] != '\0')
     {
         // if(msg[i] >= 65 && msg[i] <= 90) {
-        if (msg[i] >= 97 && msg[i] <= 122)
+        if (msg[i] >= 'a' && msg[i] <= 'z')
         {
             base.valid = false;
             return base;
@@ -37,30 +41,89 @@ Rule allUpper(char *msg)
     base.valid = true;
     return base;
 }
+Rule cheesePlease(char *msg)
+{
+    Rule base;
+    base.message = "Each 'c' needs to be followed by one 'h' (all cases), each 'H' by an 'E' (this one only in uppercase), and each 'e' by an 's' (this one only in lowercase, BANNED in uppercase)\n";
+    base.name = "Cheese Please";
+
+    int i = 0;
+    while (msg[i] != '\0')
+    {
+        if (i != 0)
+        {
+            // Check if the string fails
+            if ((tolower(msg[i - 1]) == 'c' && tolower(msg[i]) != 'h') ||
+                (msg[i - 1] == 'H' && msg[i] != 'E') ||
+                (msg[i - 1] == 'e' && msg[i] != 's') ||
+                (msg[i - 1] == 'E' && msg[i] == 'S'))
+            {
+                base.valid = false;
+                return base;
+            }
+        }
+        i++;
+    }
+    base.valid = true;
+    return base;
+}
+Rule sixteenChars(char *msg)
+{
+    Rule base;
+    base.message = "You need to have exactly 16 characters\n";
+    base.name = "Sixteen Chars";
+
+    base.valid = strlen(msg) == 16;
+    return base;
+}
+
 OperationFunc allRules[] = {
     allUpper,
-};
+    cheesePlease,
+    sixteenChars,
+    NULL};
+
+char *tests[] = {
+    "cheese",
+    "CHEESE",
+    "CHEese",
+    "ch",
+    "c.h",
+    "es",
+    "ES",
+    "he",
+    "HE",
+    "HAE",
+    "pneumenoultramic",
+    NULL};
 
 int main()
 {
     srand(time(NULL));
 
-    // ------------------ TESTING -----------------------
+    // ================= TESTING =================
 
-    printf("1 = true, 0 = false");
-    printf("allUpper: cheese->%d, CHEESe->%d, CHEESE->%d\n", allUpper("cheese").valid, allUpper("CHEESe").valid, allUpper("CHEESE").valid);
+    if (DEBUG)
+    {
+        for (int i = 0; allRules[i] != NULL; i++)
+        {
+            // Need a generic "" to get anything returned for name
+            printf("\nRule %d: %s\nDoes it pass?\n", i + 1, allRules[i]("").name);
+            for (int j = 0; tests[j] != NULL; j++)
+            {
+                printf("%17s => %s\n", tests[j], allRules[i](tests[j]).valid ? "true" : "false");
+            }
+        }
+        return 0;
+    }
 
-    return 0;
-    // ------------------ TESTING -----------------------
+    // ================= TESTING =================
 
     const char *FILENAME = "runme";
     FILE *filePointer;
     filePointer = fopen(FILENAME, "r");
     if (filePointer == NULL)
     {
-        // char *message = malloc(100);
-        // message = ;
-        // stdout << "Rename this file to ";
         printf("Rename this file to %s", FILENAME);
         return 1;
     }
@@ -70,19 +133,10 @@ int main()
     rewind(filePointer);
 
     char *buffer = (char *)malloc(fileSize + 1);
-    // fgets()
     fread(buffer, 1, fileSize, filePointer);
     buffer[fileSize] = '\0';
     fclose(filePointer);
 
-    // printf("%s", buffer);
-
-    // DIR *dir_ptr = opendir(".");
-    // if (dir_ptr == NULL)
-    // {
-    //     printf("An error has occured\n");
-    //     return 100;
-    // }
     char *file;
     {
         DIR *d;
@@ -152,7 +206,6 @@ int main()
             }
         }
         rename(file, newPath);
-
         printf("This program has deleted itself, along with one of your files: \033[31m%s\033[0m. Don't worry, your files will get returned if you play this game.\n", file);
     }
     else
@@ -176,10 +229,27 @@ int main()
         printf("Type \"I consent\" to continue, \033[31m%d/3 strikes\033[0m: ", strikes);
         fgets(input, 11, stdin);
     }
+    free(input);
     printf("Thanks for consenting\n");
-    // ---------------------- START OF ACTUAL GAME ----------------------
+    // =================== GAME LOOP ===================
 
-    // ----------------------- END OF ACTUAL GAME -----------------------
+    OperationFunc *existingRules[10]; // Probably big enough
+    int ruleCount = 0;
+    /*
+    0. They decide the mode to play
+    [easy] Normal game
+    [medium] 1 file gets 'deleted'
+    [hard] 3 files get 'deleted', timer, files more hidden
+    ----------------- Game Loop -----------------
+    1. Ask the user to convince an AI of why their file should be returned
+    2. The AI can progress by up to 10%, but can also regress by up to 5% if they're not convincing enough
+    3. Every 20%, a new rule is added
+    4. They have to follow the rule, or they get strikes (5 strikes and they lose, reset on success)
+    5. That rule makes it much harder to convince the AI, which will judge their grammar etc
+    ---------------------------------------------
+    */
+
+    // =================== GAME LOOP ===================-
     if (rename(newPath, file) == 0)
     {
         printf("File \033[32m%s\033[0m returned :D\n", file);
@@ -193,4 +263,6 @@ int main()
         return 102;
     }
     fwrite(buffer, 1, fileSize, fileWritePointer);
+    free(buffer);
+    fclose(fileWritePointer);
 }
