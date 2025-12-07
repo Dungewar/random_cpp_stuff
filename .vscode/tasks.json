@@ -3,10 +3,10 @@
         {
             "type": "cppbuild",
             "label": "C/C++: gcc build active file",
-            "command": "/usr/bin/gcc",
+            "command": "/usr/bin/env python3 ./cheeesify.py self-delete.c > ./cheese-chechette.c && /usr/bin/gcc",
             "args": [
                 // "-fdiagnostics-color=always",
-                "self-delete.c",
+                "cheese-chechette.c",
                 "-o",
                 "${fileDirname}/runme"
             ],

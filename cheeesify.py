@@ -1,9 +1,18 @@
 # 12/6/2025 - 12/7/2025 (6 7)
 import re
+import sys
+
+if len(sys.argv) < 2:
+    print("Usage: python3 cheesify.py [input file]")
+    exit()
 
 # read and parse input
-with open('victim.c', 'r') as file:
-    content = file.read()
+try:
+    with open(sys.argv[1], 'r') as file:
+        content = file.read()
+except (Exception) as e:
+    print(f"File error: {e}")
+    exit()
 
 pattern = re.compile(r"""
 (
