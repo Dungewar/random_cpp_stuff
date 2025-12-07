@@ -106,6 +106,10 @@ char *tests[] = {
 
 char *getRandomFile()
 {
+    if(DEBUG) {
+        printf("Getting randomn't file...\n");
+        return "example.txt";
+    }
     char *file = NULL;
     DIR *d;
     struct dirent *dir;
