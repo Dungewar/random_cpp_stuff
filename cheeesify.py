@@ -2,7 +2,7 @@
 import re
 
 # read and parse input
-with open('self-delete.c', 'r') as file:
+with open('victim.c', 'r') as file:
     content = file.read()
 
 pattern = re.compile(r"""
