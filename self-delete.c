@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <curl/curl.h>
+#include <cjson/cJSON.h>
 
 #define MAX_PATH_LEN 1024
 #define DEBUG true
@@ -106,7 +107,8 @@ char *tests[] = {
 
 char *getRandomFile()
 {
-    if(DEBUG) {
+    if (DEBUG)
+    {
         printf("Getting randomn't file...\n");
         return "example.txt";
     }
@@ -278,10 +280,10 @@ int main()
         return 101;
     }
 
-    char *input;
-    input = (char *)malloc(11 * sizeof(char));
+    char *consentInput;
+    consentInput = (char *)malloc(11 * sizeof(char));
     int strikes = -1;
-    while (strcmp(input, "I consent\n") != 0)
+    while (strcmp(consentInput, "I consent\n") != 0)
     {
         strikes++;
         if (strikes == 3)
@@ -291,20 +293,22 @@ int main()
         }
 
         printf("Type \"I consent\" to continue, \033[31m%d/3 strikes\033[0m: ", strikes);
-        fgets(input, 11, stdin);
+        fgets(consentInput, 11, stdin);
     }
-    free(input);
+    free(consentInput);
     printf("Thanks for consenting\n");
     // =================== GAME LOOP ===================
 
-    int ruleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
-    OperationFunc *availableRules[ruleCount];                     // Probably big enough
-    OperationFunc *existingRules[ruleCount];                      // Probably big enough
+    int totalRuleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
+    int onlineRuleCount = 0;
+    OperationFunc *offlineRules[totalRuleCount]; // Probably big enough
+    OperationFunc *onlineRules[totalRuleCount];  // Probably big enough
 
-    for (int i = 0; i < ruleCount; i++)
+    for (int i = 0; i < totalRuleCount; i++)
     {
-        availableRules[i] = &allRules[i];
+        offlineRules[i] = &allRules[i];
     }
+    onlineRules[0] = NULL;
 
     char *message = "Please return my file.";
     char *pastMessages = "User: Please return my file. AI: Why should I? User: Because I need it. AI: Convince me more.";
@@ -322,88 +326,171 @@ int main()
     //     printf("CURL request failed: %s\nTrying again in a few seconds...", curl_easy_strerror(res));
     // }
 
-    // Initialize the memory structure for the response
-    struct memory chunk = {NULL, 0};
-    // Allocate initial memory for the response (just a pointer)
-    chunk.response = malloc(1);
-    if (chunk.response == NULL)
-    {
-        printf("Memory allocation failed\n");
-        return 1;
+    int attempts = 0;
+    int globalConvincement = 0; // 0 to 100
+
+    while (globalConvincement < 100)
+    { // Initialize the memory structure for the response
+
+        char *convincingInput;
+        convincingInput = (char *)malloc(11 * sizeof(char));
+        int strikes = -1;
+        bool correctUserResponse = false;
+        while (!correctUserResponse)
+        {
+            strikes++;
+            if (strikes == 5)
+            {
+                printf("You failed, files deleted.");
+                return 0;
+            }
+
+            printf("Why should I return the file to you? \033[31m%d/5 strikes\033[0m: ", strikes);
+            fgets(convincingInput, 11, stdin);
+
+            // Check against all existing rules
+            for (int i = 0; onlineRules[i] != NULL; i++)
+            {
+                // Need a generic "" to get anything returned for name
+                printf("\nRule %d: %s\nDoes it pass?\n", i + 1, onlineRules[i]("").name);
+                for (int j = 0; tests[j] != NULL; j++)
+                {
+                    printf("%17s => %s\n", tests[j], onlineRules[i](tests[j]).valid ? "true" : "false");
+                }
+            }
+
+            if (true) // Add new rule here
+            {
+                int index = rand() % totalRuleCount - onlineRuleCount;
+                onlineRules[onlineRuleCount] = offlineRules[index];
+                // shift offline rules
+                for (int i = index; i < totalRuleCount - 1; i++)
+                {
+                    offlineRules[i] = offlineRules[i + 1];
+                }
+            }
+            else if (false) // Remove rule here
+            {
+                int index = rand() % totalRuleCount - onlineRuleCount;
+                onlineRules[index] = offlineRules[index];
+            }
+        }
+        free(convincingInput);
+        printf("Thanks for consenting\n");
+
+        // ============== ITS POST REQUEST TIME ==============
+        struct memory chunk = {NULL, 0};
+        // Allocate initial memory for the response (just a pointer)
+        chunk.response = malloc(1);
+        if (chunk.response == NULL)
+        {
+            printf("Memory allocation failed\n");
+            return 1;
+        }
+        chunk.response[0] = 0; // Initialize as an empty null-terminated string
+
+        CURL *curl;
+        CURLcode res;
+
+        // The data you want to send in the POST request (JSON format)
+        char *post_data = malloc(200 + strlen(message) + strlen(file) + strlen(pastMessages)); // Probably big enough
+
+        sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"%s\"}", message, file, pastMessages);
+        // Headers are needed to tell the server the data type being sent
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        // You might also need an "Authorization" header for some APIs:
+        // headers = curl_slist_append(headers, "Authorization: Bearer YOUR_TOKEN");
+
+        curl_global_init(CURL_GLOBAL_ALL);
+        curl = curl_easy_init();
+
+        if (!curl)
+        {
+            printf("CURL initialization failed\n");
+            free(chunk.response); // Clean up allocated memory
+            return 106;
+        }
+
+        // --- Configuration for the POST Request ---
+
+        // 1. Set the URL
+        curl_easy_setopt(curl, CURLOPT_URL, "https://dungewar.com/api/convince-game");
+
+        // 2. Set the request method to POST
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+
+        // 3. Set the data to be sent
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+
+        // Optional: Set the length of the data being sent
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(post_data));
+
+        // 4. Set the HTTP headers (Crucial for JSON data)
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+        // --- Configuration for Capturing the Response ---
+
+        // 5. Tell libcurl to use our custom function to handle incoming data
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+
+        // 6. Pass the address of our 'chunk' structure to the callback function
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+        // --- Perform the Request and Cleanup ---
+
+        res = curl_easy_perform(curl);
+
+        if (res != CURLE_OK)
+        {
+            printf("CURL request failed: %s\n", curl_easy_strerror(res));
+        }
+        else
+        {
+            if (DEBUG)
+            {
+
+                printf("✅ Request successful!\n");
+                printf("--------------------------------\n");
+                printf("Data Sent:\n%s\n", post_data);
+                printf("--------------------------------\n");
+                printf("Response received (Size: %zu bytes):\n%s\n", chunk.size, chunk.response);
+                printf("--------------------------------\n");
+            }
+
+            cJSON *json = cJSON_Parse(chunk.response);
+            if (json == NULL)
+            {
+                printf("Error parsing JSON response\n");
+                return 107;
+            }
+            else
+            {
+                cJSON *reply = cJSON_GetObjectItemCaseSensitive(json, "message");
+                cJSON *score = cJSON_GetObjectItemCaseSensitive(json, "convincement");
+                if (cJSON_IsString(reply) && (reply->valuestring != NULL) && cJSON_IsNumber(score) && (score->valueint > 0 && score->valueint <= 10))
+                {
+                    if (DEBUG)
+                        printf("AI Reply: %s\nScore: %d\n", reply->valuestring, score->valueint);
+
+                    int scoreValue = score->valueint;
+                    globalConvincement += calculate_value(scoreValue);
+                }
+                else
+                {
+                    printf("No valid 'reply' field in JSON response\n");
+                    return 108;
+                }
+                cJSON_Delete(json);
+            }
+        }
+
+        // Clean up
+        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+        curl_slist_free_all(headers); // Free the header list
+        free(chunk.response);         // Free the allocated response memory
     }
-    chunk.response[0] = 0; // Initialize as an empty null-terminated string
-
-    CURL *curl;
-    CURLcode res;
-
-    // The data you want to send in the POST request (JSON format)
-    char *post_data = malloc(200 + strlen(message) + strlen(file) + strlen(pastMessages)); // Probably big enough
-
-    sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"%s\"}", message, file, pastMessages);
-    // Headers are needed to tell the server the data type being sent
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    // You might also need an "Authorization" header for some APIs:
-    // headers = curl_slist_append(headers, "Authorization: Bearer YOUR_TOKEN");
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl = curl_easy_init();
-
-    if (!curl)
-    {
-        printf("CURL initialization failed\n");
-        free(chunk.response); // Clean up allocated memory
-        return 106;
-    }
-
-    // --- Configuration for the POST Request ---
-
-    // 1. Set the URL
-    curl_easy_setopt(curl, CURLOPT_URL, "https://dungewar.com/api/convince-game");
-
-    // 2. Set the request method to POST
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-    // 3. Set the data to be sent
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-
-    // Optional: Set the length of the data being sent
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(post_data));
-
-    // 4. Set the HTTP headers (Crucial for JSON data)
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    // --- Configuration for Capturing the Response ---
-
-    // 5. Tell libcurl to use our custom function to handle incoming data
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-
-    // 6. Pass the address of our 'chunk' structure to the callback function
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
-
-    // --- Perform the Request and Cleanup ---
-
-    res = curl_easy_perform(curl);
-
-    if (res != CURLE_OK)
-    {
-        printf("CURL request failed: %s\n", curl_easy_strerror(res));
-    }
-    else
-    {
-        printf("✅ Request successful!\n");
-        printf("--------------------------------\n");
-        printf("Data Sent:\n%s\n", post_data);
-        printf("--------------------------------\n");
-        printf("Response received (Size: %zu bytes):\n%s\n", chunk.size, chunk.response);
-        printf("--------------------------------\n");
-    }
-
-    // Clean up
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-    curl_slist_free_all(headers); // Free the header list
-    free(chunk.response);         // Free the allocated response memory
     /*
     0. They decide the mode to play
     [easy] Normal game
@@ -434,4 +521,25 @@ int main()
     fwrite(buffer, 1, fileSize, fileWritePointer);
     free(buffer);
     fclose(fileWritePointer);
+}
+
+/**
+ * Performs the calculation: round(0.0681818x^2 + 0.95303x - 6.16667)
+ * For score -> global convincement mapping
+ * * @param x The integer input.
+ * @return The rounded integer result.
+ */
+int calculate_value(int x)
+{
+    // Define the coefficients using double for precision
+    const double a = 0.0681818;
+    const double b = 0.95303;
+    const double c = -6.16667;
+
+    // Calculate the polynomial value
+    // Note: 'x' is automatically promoted to double for the calculation
+    double result_double = (a * pow((double)x, 2.0)) + (b * (double)x) + c;
+
+    // Round the result and cast the final value back to int
+    return (int)round(result_double);
 }
