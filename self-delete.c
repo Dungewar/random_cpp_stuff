@@ -4,8 +4,9 @@ TODO:
 - Add restarts
 - More files?
 - Add loading animations for waiting for server
-- Add active rules list
-- Add "rules deleted" whenever it's deleted
+- Fix ctrl+c and also arrow keys not working
+- Global progress bar
+- Saving
 */
 
 #include <stdio.h>
@@ -21,10 +22,11 @@ TODO:
 #include <cJSON.h>
 #include <math.h>
 #include <unistd.h>
+// #include <ncurses.h>
 // #include <mathcalls.h>
 
 #define MAX_PATH_LEN 1024
-#define DEBUG false
+#define DEBUG true
 // #define FILENAME = "runme"
 
 // DO NOT FREE STRINGS IN RULE STRUCTURE
@@ -89,7 +91,7 @@ Rule sixteenChars(char *msg)
     base.message = "You need to have exactly 16 characters\n";
     base.name = "Sixteen Chars";
 
-    base.valid = strlen(msg) == 17;
+    base.valid = strlen(msg) == 17; // to account for newline character
     return base;
 }
 
@@ -385,6 +387,7 @@ int main()
     char *pastMessages = malloc(1000 * sizeof(char)); // We don't want to send too much to the AI anyway :)
     pastMessages[0] = '\0';
 
+    curl_global_init(CURL_GLOBAL_ALL);
     int attempts = 0;
     int globalConvincement = 0; // 0 to 100
     printf("Now, convince me that your file \033[32m%s\033[0m should be returned to you.\n\033[41m[200 char limit per message]\033[0m\n", file);
@@ -393,6 +396,17 @@ int main()
     while (globalConvincement < 100)
     { // Initialize the memory structure for the response
         printf("\n\033[47m\033[30m--- Attempt %d ---\033[0m\nConvincement: \033[32m%d/100\033[0m\n", ++attempts, globalConvincement);
+        if (onlineRuleCount > 0)
+        {
+            printf("Active Rules:\n");
+            for (int i = 0; i < onlineRuleCount; i++)
+            {
+                char *ruleDescription = pretty_rule_print(onlineRules[i](""));
+                printf("%s\n", ruleDescription);
+                free(ruleDescription);
+            }
+            printf("\n");
+        }
 
         char *convincingInput;
         convincingInput = (char *)malloc(200 * sizeof(char));
@@ -445,7 +459,8 @@ int main()
         chunk.response[0] = 0; // Initialize as an empty null-terminated string
 
         CURL *curl;
-        CURLcode res;
+        CURLM *multi;
+        CURLMcode res;
 
         // The data you want to send in the POST request (JSON format)
         // char *post_data = malloc(200 + strlen(convincingInput) + strlen(file) + strlen(pastMessages)); // Probably big enough
@@ -477,8 +492,8 @@ int main()
         // You might also need an "Authorization" header for some APIs:
         // headers = curl_slist_append(headers, "Authorization: Bearer YOUR_TOKEN");
 
-        curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
+        multi = curl_multi_init();
 
         if (!curl)
         {
@@ -486,6 +501,7 @@ int main()
             free(chunk.response); // Clean up allocated memory
             return 106;
         }
+        curl_multi_add_handle(multi, curl);
 
         // --- Configuration for the POST Request ---
 
@@ -514,7 +530,30 @@ int main()
 
         // --- Perform the Request and Cleanup ---
 
-        res = curl_easy_perform(curl);
+        // TODO: FIX
+        curl_multi_add_handle(multi, curl);
+        int still_running; /* keep number of running handles */
+        printf("Thinking..");
+        // long currentTime = time(NULL);
+        do
+        {
+            res = curl_multi_perform(multi, &still_running);
+
+            if (!res && still_running)
+                /* wait for activity, timeout or "nothing" */
+                res = curl_multi_poll(multi, NULL, 0, 1000, NULL);
+
+            if (res)
+            {
+                fprintf(stderr, "curl_multi_poll() failed, code %d.\n", (int)res);
+                break;
+            }
+            putchar('.');
+            fflush(stdout);
+            usleep(500000); // Sleep for 500 milliseconds
+
+        } while (still_running); /* if there are still transfers, loop */
+        printf("\033[1K");
 
         if (res != CURLE_OK)
         {
@@ -566,7 +605,7 @@ int main()
         // Clean up
         free(convincingInput);
         curl_easy_cleanup(curl);
-        curl_global_cleanup();
+
         curl_slist_free_all(headers); // Free the header list
         free(chunk.response);         // Free the allocated response memory
         cJSON_free(post_data);
@@ -592,6 +631,9 @@ int main()
         else if ((globalConvincement < 20 && onlineRuleCount > 0) || (globalConvincement < 40 && onlineRuleCount > 1)) // Remove rule here
         {
 
+            char *ruleDescription = pretty_rule_print(onlineRules[onlineRuleCount - 1](""));
+            printf("Removed %s", ruleDescription);
+            free(ruleDescription);
             offlineRules[totalRuleCount - onlineRuleCount] = onlineRules[onlineRuleCount - 1];
             onlineRules[onlineRuleCount - 1] = NULL;
 
@@ -630,4 +672,5 @@ int main()
     fwrite(buffer, 1, fileSize, fileWritePointer);
     free(buffer);
     fclose(fileWritePointer);
+    curl_global_cleanup();
 }
