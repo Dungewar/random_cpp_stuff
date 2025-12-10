@@ -140,7 +140,6 @@ char *getRandomFile()
                 }
                 return NULL;
             }
-            printf("%s\n", files[i]);
             if (DEBUG)
             {
                 printf("%s\n", files[i]);
@@ -225,6 +224,7 @@ int calculate_value(int x)
     // Note: 'x' is automatically promoted to double for the calculation
     double result_double = (a * pow((double)x, 2.0)) + (b * (double)x) + c;
 
+    result_double *= 2; // To speed up the game a bit
     // Round the result and cast the final value back to int
     return (int)round(result_double);
 }
@@ -256,6 +256,12 @@ int main()
             }
         }
         // return 0;
+
+        printf("\n\nCalculating values for 1-10:\n");
+        for (int i = 1; i <= 10; i++)
+        {
+            printf("%d => %d\n", i, calculate_value(i));
+        }
     }
 
     // ================= TESTING =================
@@ -295,7 +301,8 @@ int main()
         {
             if (errno == EEXIST)
             {
-                printf("Directory '%s' already exists.\n", destDir);
+                if (DEBUG)
+                    printf("Directory '%s' already exists.\n", destDir);
             }
             else
             {
@@ -305,7 +312,8 @@ int main()
             }
         }
         rename(file, newPath);
-        // printf("This program has deleted itself, along with one of your files: \033[31m%s\033[0m. Don't worry, your files will get returned if you play this game.\n", file);
+        if (!DEBUG) // to not scare testers
+            printf("This program has deleted itself, along with one of your files: \033[31m%s\033[0m. Don't worry, your files will get returned if you play this game.\n", file);
     }
     else
     {
@@ -330,7 +338,7 @@ int main()
     }
     free(consentInput);
     printf("Thanks for consenting\n");
-    // =================== GAME LOOP ===================
+    // =================== GAME ===================
 
     int totalRuleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
     int onlineRuleCount = 0;                                           // Defined as the following being true: onlineRules[onlineRuleCount] == NULL
@@ -348,12 +356,15 @@ int main()
 
     int attempts = 0;
     int globalConvincement = 0; // 0 to 100
+    printf("Now, convince me that your file \033[32m%s\033[0m should be returned to you.\n\033[41m[200 char limit per message]\033[0m\n", file);
 
+    // ========================= GAME LOOP START =========================
     while (globalConvincement < 100)
     { // Initialize the memory structure for the response
+        printf("\n\033[47m\033[30m--- Attempt %d ---\033[0m\nConvincement: \033[32m%d/100\033[0m\n", ++attempts, globalConvincement);
 
         char *convincingInput;
-        convincingInput = (char *)malloc(100 * sizeof(char));
+        convincingInput = (char *)malloc(200 * sizeof(char));
         int strikes = -1;
         bool correctUserResponse = false;
         while (!correctUserResponse)
@@ -365,8 +376,15 @@ int main()
                 return 0;
             }
 
-            printf("\033[31m%d/5 strikes\033[0m\nResponse: ", strikes);
-            fgets(convincingInput, 100, stdin);
+            printf("\033[31m%d/5 strikes\033[0m\nYour message: ", strikes);
+            fgets(convincingInput, 200, stdin);
+            if (convincingInput[strlen(convincingInput) - 1] != '\n')
+            {
+                // Clear the input buffer
+                int c;
+                while ((c = getchar()) != '\n' && c != EOF)
+                    ;
+            }
 
             correctUserResponse = true;
             // Check against all existing rules
@@ -499,8 +517,8 @@ int main()
                 cJSON *score = cJSON_GetObjectItemCaseSensitive(json, "convincement");
                 if (cJSON_IsString(reply) && (reply->valuestring != NULL) && cJSON_IsNumber(score) && (score->valueint > 0 && score->valueint <= 10))
                 {
-                    if (DEBUG)
-                        printf("AI Reply: %s\nScore: %d\n", reply->valuestring, score->valueint);
+
+                    printf("\033[94m%s\033[0m\nScore: %d\n", reply->valuestring, score->valueint);
 
                     int scoreValue = score->valueint;
                     globalConvincement += calculate_value(scoreValue);
@@ -566,7 +584,7 @@ int main()
     ---------------------------------------------
     */
 
-    // =================== GAME LOOP ===================-
+    // =================== FINAL RETURN ===================
     if (rename(newPath, file) == 0)
     {
         printf("File \033[32m%s\033[0m returned :D\n", file);
