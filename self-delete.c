@@ -8,12 +8,15 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <curl/curl.h>
-#include <cjson/cJSON.h>
+#include <cJSON.h>
+#include <math.h>
+// #include <mathcalls.h>
 
 #define MAX_PATH_LEN 1024
 #define DEBUG true
 // #define FILENAME = "runme"
 
+// DO NOT FREE STRINGS IN RULE STRUCTURE
 typedef struct
 {
     const char *message;
@@ -205,6 +208,36 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *data)
     return realsize;
 }
 
+/**
+ * Performs the calculation: round(0.0681818x^2 + 0.95303x - 6.16667)
+ * For score -> global convincement mapping
+ * * @param x The integer input.
+ * @return The rounded integer result.
+ */
+int calculate_value(int x)
+{
+    // Define the coefficients using double for precision
+    const double a = 0.0681818;
+    const double b = 0.95303;
+    const double c = -6.16667;
+
+    // Calculate the polynomial value
+    // Note: 'x' is automatically promoted to double for the calculation
+    double result_double = (a * pow((double)x, 2.0)) + (b * (double)x) + c;
+
+    // Round the result and cast the final value back to int
+    return (int)round(result_double);
+}
+
+char *pretty_rule_print(Rule rule)
+{
+    // 30 for formatting, 20 extra
+    char *returnString = (char *)malloc((strlen(rule.name) + strlen(rule.message) + 50) * sizeof(char));
+
+    sprintf(returnString, "Rule \033[1m%s[\033[0m:\n\033[3m%s\033[0m\n", rule.name, rule.message);
+    return returnString;
+}
+
 int main()
 {
     srand(time(NULL));
@@ -272,7 +305,7 @@ int main()
             }
         }
         rename(file, newPath);
-        printf("This program has deleted itself, along with one of your files: \033[31m%s\033[0m. Don't worry, your files will get returned if you play this game.\n", file);
+        // printf("This program has deleted itself, along with one of your files: \033[31m%s\033[0m. Don't worry, your files will get returned if you play this game.\n", file);
     }
     else
     {
@@ -300,31 +333,18 @@ int main()
     // =================== GAME LOOP ===================
 
     int totalRuleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
-    int onlineRuleCount = 0;
-    OperationFunc *offlineRules[totalRuleCount]; // Probably big enough
-    OperationFunc *onlineRules[totalRuleCount];  // Probably big enough
+    int onlineRuleCount = 0;                                           // Defined as the following being true: onlineRules[onlineRuleCount] == NULL
+    OperationFunc offlineRules[totalRuleCount];                        // Probably big enough
+    OperationFunc onlineRules[totalRuleCount];                         // Probably big enough
+    onlineRules[0] = NULL;
 
     for (int i = 0; i < totalRuleCount; i++)
     {
-        offlineRules[i] = &allRules[i];
+        offlineRules[i] = allRules[i];
     }
-    onlineRules[0] = NULL;
 
-    char *message = "Please return my file.";
-    char *pastMessages = "User: Please return my file. AI: Why should I? User: Because I need it. AI: Convince me more.";
-    // CURL *curl = curl_easy_init();
-    // if(!curl) {
-    //     printf("CURL initialization failed\n");
-    //     return 106;
-    // }
-    // CURLcode res;
-    // curl_easy_setopt(curl, CURLOPT_URL, "https://dungewar.com/api/convince-game");
-    // res = curl_easy_perform(curl);
-    // curl_easy_cleanup(curl);
-
-    // if(res != CURLE_OK) {
-    //     printf("CURL request failed: %s\nTrying again in a few seconds...", curl_easy_strerror(res));
-    // }
+    char *pastMessages = malloc(1000 * sizeof(char)); // We don't want to send too much to the AI anyway :)
+    pastMessages[0] = '\0';
 
     int attempts = 0;
     int globalConvincement = 0; // 0 to 100
@@ -333,7 +353,7 @@ int main()
     { // Initialize the memory structure for the response
 
         char *convincingInput;
-        convincingInput = (char *)malloc(11 * sizeof(char));
+        convincingInput = (char *)malloc(100 * sizeof(char));
         int strikes = -1;
         bool correctUserResponse = false;
         while (!correctUserResponse)
@@ -345,38 +365,27 @@ int main()
                 return 0;
             }
 
-            printf("Why should I return the file to you? \033[31m%d/5 strikes\033[0m: ", strikes);
-            fgets(convincingInput, 11, stdin);
+            printf("\033[31m%d/5 strikes\033[0m\nResponse: ", strikes);
+            fgets(convincingInput, 100, stdin);
 
+            correctUserResponse = true;
             // Check against all existing rules
             for (int i = 0; onlineRules[i] != NULL; i++)
             {
                 // Need a generic "" to get anything returned for name
-                printf("\nRule %d: %s\nDoes it pass?\n", i + 1, onlineRules[i]("").name);
-                for (int j = 0; tests[j] != NULL; j++)
-                {
-                    printf("%17s => %s\n", tests[j], onlineRules[i](tests[j]).valid ? "true" : "false");
-                }
-            }
+                if (DEBUG)
+                    printf("\nRule %d: %s\nDoes it pass?\n", i + 1, onlineRules[i]("").name);
 
-            if (true) // Add new rule here
-            {
-                int index = rand() % totalRuleCount - onlineRuleCount;
-                onlineRules[onlineRuleCount] = offlineRules[index];
-                // shift offline rules
-                for (int i = index; i < totalRuleCount - 1; i++)
+                Rule result = onlineRules[i](convincingInput);
+                if (result.valid == false)
                 {
-                    offlineRules[i] = offlineRules[i + 1];
+                    correctUserResponse = false;
+                    char *prettyPrint = pretty_rule_print(result);
+                    printf("You broke %s\n", prettyPrint);
+                    free(prettyPrint);
                 }
-            }
-            else if (false) // Remove rule here
-            {
-                int index = rand() % totalRuleCount - onlineRuleCount;
-                onlineRules[index] = offlineRules[index];
             }
         }
-        free(convincingInput);
-        printf("Thanks for consenting\n");
 
         // ============== ITS POST REQUEST TIME ==============
         struct memory chunk = {NULL, 0};
@@ -393,9 +402,29 @@ int main()
         CURLcode res;
 
         // The data you want to send in the POST request (JSON format)
-        char *post_data = malloc(200 + strlen(message) + strlen(file) + strlen(pastMessages)); // Probably big enough
+        // char *post_data = malloc(200 + strlen(convincingInput) + strlen(file) + strlen(pastMessages)); // Probably big enough
+        // sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"[Most recent messages first]: %s\"}", convincingInput, file, pastMessages);
 
-        sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"%s\"}", message, file, pastMessages);
+        cJSON *root = cJSON_CreateObject();
+        if (root == NULL)
+        {
+            // Handle error
+            printf("Failed to create JSON object, critical error\n");
+            return 109;
+        }
+        cJSON_AddStringToObject(root, "message", convincingInput);
+        cJSON_AddStringToObject(root, "fileName", file); // Assuming 'file' could also contain special chars
+        cJSON_AddStringToObject(root, "pastMessages", pastMessages);
+        char *post_data = cJSON_PrintUnformatted(root);
+
+        // Check for allocation failure
+        if (post_data == NULL)
+        {
+            // Handle error
+            cJSON_Delete(root);
+            return 110;
+        }
+
         // Headers are needed to tell the server the data type being sent
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -450,7 +479,7 @@ int main()
             if (DEBUG)
             {
 
-                printf("✅ Request successful!\n");
+                printf("\033[32mRequest successful\033[0m!\n");
                 printf("--------------------------------\n");
                 printf("Data Sent:\n%s\n", post_data);
                 printf("--------------------------------\n");
@@ -475,6 +504,7 @@ int main()
 
                     int scoreValue = score->valueint;
                     globalConvincement += calculate_value(scoreValue);
+                    sprintf(pastMessages, "User: %s\nAI: %s\n", convincingInput, reply->valuestring);
                 }
                 else
                 {
@@ -486,10 +516,41 @@ int main()
         }
 
         // Clean up
+        free(convincingInput);
         curl_easy_cleanup(curl);
         curl_global_cleanup();
         curl_slist_free_all(headers); // Free the header list
         free(chunk.response);         // Free the allocated response memory
+        cJSON_free(post_data);
+        cJSON_Delete(root);
+
+        // Add rules if pass thresholds
+        if ((globalConvincement > 20 && onlineRuleCount < 1) || (globalConvincement > 40 && onlineRuleCount < 2)) // Add new rule here
+        {
+            // May make it not random later
+            int index = rand() % (totalRuleCount - onlineRuleCount);
+            onlineRules[onlineRuleCount] = offlineRules[index];
+            onlineRules[onlineRuleCount + 1] = NULL;
+            onlineRuleCount++;
+            char *ruleDescription = pretty_rule_print(offlineRules[index](""));
+            printf("Added %s", ruleDescription);
+            free(ruleDescription);
+            // shift offline rules
+            for (int i = index; i < totalRuleCount - 1; i++)
+            {
+                offlineRules[i] = offlineRules[i + 1];
+            }
+        }
+        else if ((globalConvincement < 20 && onlineRuleCount > 0) || (globalConvincement < 40 && onlineRuleCount > 1)) // Remove rule here
+        {
+
+            offlineRules[totalRuleCount - onlineRuleCount] = onlineRules[onlineRuleCount - 1];
+            onlineRules[onlineRuleCount - 1] = NULL;
+
+            onlineRuleCount--;
+            // int index = rand() % totalRuleCount - onlineRuleCount;
+            // onlineRules[index] = offlineRules[index];
+        }
     }
     /*
     0. They decide the mode to play
@@ -521,25 +582,4 @@ int main()
     fwrite(buffer, 1, fileSize, fileWritePointer);
     free(buffer);
     fclose(fileWritePointer);
-}
-
-/**
- * Performs the calculation: round(0.0681818x^2 + 0.95303x - 6.16667)
- * For score -> global convincement mapping
- * * @param x The integer input.
- * @return The rounded integer result.
- */
-int calculate_value(int x)
-{
-    // Define the coefficients using double for precision
-    const double a = 0.0681818;
-    const double b = 0.95303;
-    const double c = -6.16667;
-
-    // Calculate the polynomial value
-    // Note: 'x' is automatically promoted to double for the calculation
-    double result_double = (a * pow((double)x, 2.0)) + (b * (double)x) + c;
-
-    // Round the result and cast the final value back to int
-    return (int)round(result_double);
 }

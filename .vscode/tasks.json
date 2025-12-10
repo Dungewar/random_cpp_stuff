@@ -2,25 +2,40 @@
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "C/C++: gcc build active file",
-            "command": "/usr/bin/env python3 ./cheeesify.py self-delete.c > ./cheese-chechette.c && /usr/bin/gcc",
+            "label": "C: gcc build active file",
+            // "command": "/usr/bin/env python3 ./cheeesify.py self-delete.c > ./cheese-chechette.c && /usr/bin/gcc",
+            "command": "/usr/bin/gcc",
             "args": [
-                // "-fdiagnostics-color=always",
-                "cheese-chechette.c",
-                "-o",
-                "${fileDirname}/runme"
+                "self-delete.c", // File to compile
+                "cJSON.c", // File to compile
+                "-I.", // Include current directory for headers (cJSON.h)
+                "-lcurl", // Link with libcurl
+                "-lm", // Link with math library
+                "-o", // Output flag
+                "runme", // Output executable name
             ],
             "options": {
                 "cwd": "${fileDirname}"
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "detail": "**I** made this task"
+        },
+        {
+            "type": "shell",
+            "label": "Run Executable",
+            "command": "echo \"hello\" > example.txt && ./runme",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "C: gcc build active file",
+            "detail": "Run the compiled executable"
         }
     ],
     "version": "2.0.0"
