@@ -1,3 +1,13 @@
+/*
+TODO:
+- Add more rules
+- Add restarts
+- More files?
+- Add loading animations for waiting for server
+- Add active rules list
+- Add "rules deleted" whenever it's deleted
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,10 +20,11 @@
 #include <curl/curl.h>
 #include <cJSON.h>
 #include <math.h>
+#include <unistd.h>
 // #include <mathcalls.h>
 
 #define MAX_PATH_LEN 1024
-#define DEBUG true
+#define DEBUG false
 // #define FILENAME = "runme"
 
 // DO NOT FREE STRINGS IN RULE STRUCTURE
@@ -78,7 +89,7 @@ Rule sixteenChars(char *msg)
     base.message = "You need to have exactly 16 characters\n";
     base.name = "Sixteen Chars";
 
-    base.valid = strlen(msg) == 16;
+    base.valid = strlen(msg) == 17;
     return base;
 }
 
@@ -229,6 +240,13 @@ int calculate_value(int x)
     return (int)round(result_double);
 }
 
+void clear_buffer()
+{
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF)
+        ;
+}
+
 char *pretty_rule_print(Rule rule)
 {
     // 30 for formatting, 20 extra
@@ -236,6 +254,16 @@ char *pretty_rule_print(Rule rule)
 
     sprintf(returnString, "Rule \033[1m%s[\033[0m:\n\033[3m%s\033[0m\n", rule.name, rule.message);
     return returnString;
+}
+
+void slow_print(const char *str)
+{
+    for (size_t i = 0; i < strlen(str); i++)
+    {
+        putchar(str[i]);
+        fflush(stdout);
+        usleep(50000); // Sleep for 50 milliseconds
+    }
 }
 
 int main()
@@ -336,6 +364,9 @@ int main()
         printf("Type \"I consent\" to continue, \033[31m%d/3 strikes\033[0m: ", strikes);
         fgets(consentInput, 11, stdin);
     }
+    // Clear the input buffer
+    if (consentInput[strlen(consentInput) - 1] != '\n')
+        clear_buffer();
     free(consentInput);
     printf("Thanks for consenting\n");
     // =================== GAME ===================
@@ -380,10 +411,7 @@ int main()
             fgets(convincingInput, 200, stdin);
             if (convincingInput[strlen(convincingInput) - 1] != '\n')
             {
-                // Clear the input buffer
-                int c;
-                while ((c = getchar()) != '\n' && c != EOF)
-                    ;
+                clear_buffer();
             }
 
             correctUserResponse = true;
@@ -517,8 +545,10 @@ int main()
                 cJSON *score = cJSON_GetObjectItemCaseSensitive(json, "convincement");
                 if (cJSON_IsString(reply) && (reply->valuestring != NULL) && cJSON_IsNumber(score) && (score->valueint > 0 && score->valueint <= 10))
                 {
-
-                    printf("\033[94m%s\033[0m\nScore: %d\n", reply->valuestring, score->valueint);
+                    char *response = malloc(strlen(reply->valuestring) + 50);
+                    sprintf(response, "\033[94m%s\033[0m\nScore: %d\n", reply->valuestring, score->valueint);
+                    slow_print(response);
+                    free(response);
 
                     int scoreValue = score->valueint;
                     globalConvincement += calculate_value(scoreValue);
