@@ -1,12 +1,10 @@
 /*
 TODO:
 - Add more rules
-- Add restarts
 - More files?
-- Add loading animations for waiting for server
 - Fix ctrl+c and also arrow keys not working
-- Global progress bar
 - Saving
+// - Global progress bar
 */
 
 #include <stdio.h>
@@ -22,12 +20,35 @@ TODO:
 #include <cJSON.h>
 #include <math.h>
 #include <unistd.h>
+#include <termios.h>
 // #include <ncurses.h>
 // #include <mathcalls.h>
 
 #define MAX_PATH_LEN 1024
 #define DEBUG true
 // #define FILENAME = "runme"
+
+// Global to store original settings so we can restore them on exit
+struct termios orig_termios;
+
+void disableRawMode()
+{
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enableRawMode()
+{
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disableRawMode); // Ensure terminal restores even if program crashes
+
+    struct termios raw = orig_termios;
+    // ECHO: Don't print keys
+    // ICANON: Read byte-by-byte (not line-by-line)
+    // ISIG: specific to Ctrl+C (and Ctrl+Z) - prevents them from killing the app
+    raw.c_lflag &= ~(ECHO | ICANON | ISIG);
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
 
 // DO NOT FREE STRINGS IN RULE STRUCTURE
 typedef struct
@@ -373,275 +394,324 @@ int main()
     printf("Thanks for consenting\n");
     // =================== GAME ===================
 
-    int totalRuleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
-    int onlineRuleCount = 0;                                           // Defined as the following being true: onlineRules[onlineRuleCount] == NULL
-    OperationFunc offlineRules[totalRuleCount];                        // Probably big enough
-    OperationFunc onlineRules[totalRuleCount];                         // Probably big enough
-    onlineRules[0] = NULL;
-
-    for (int i = 0; i < totalRuleCount; i++)
-    {
-        offlineRules[i] = allRules[i];
-    }
-
-    char *pastMessages = malloc(1000 * sizeof(char)); // We don't want to send too much to the AI anyway :)
-    pastMessages[0] = '\0';
+    bool restart = true;
 
     curl_global_init(CURL_GLOBAL_ALL);
-    int attempts = 0;
-    int globalConvincement = 0; // 0 to 100
-    printf("Now, convince me that your file \033[32m%s\033[0m should be returned to you.\n\033[41m[200 char limit per message]\033[0m\n", file);
+    while (restart)
+    {
+        restart = false;
+        int totalRuleCount = sizeof(allRules) / sizeof(OperationFunc) - 1; // Exclude NULL terminator
+        int onlineRuleCount = 0;                                           // Defined as the following being true: onlineRules[onlineRuleCount] == NULL
+        OperationFunc offlineRules[totalRuleCount];                        // Probably big enough
+        OperationFunc onlineRules[totalRuleCount];                         // Probably big enough
+        onlineRules[0] = NULL;
 
-    // ========================= GAME LOOP START =========================
-    while (globalConvincement < 100)
-    { // Initialize the memory structure for the response
-        printf("\n\033[47m\033[30m--- Attempt %d ---\033[0m\nConvincement: \033[32m%d/100\033[0m\n", ++attempts, globalConvincement);
-        if (onlineRuleCount > 0)
+        for (int i = 0; i < totalRuleCount; i++)
         {
-            printf("Active Rules:\n");
-            for (int i = 0; i < onlineRuleCount; i++)
-            {
-                char *ruleDescription = pretty_rule_print(onlineRules[i](""));
-                printf("%s\n", ruleDescription);
-                free(ruleDescription);
-            }
-            printf("\n");
+            offlineRules[i] = allRules[i];
         }
 
-        char *convincingInput;
-        convincingInput = (char *)malloc(200 * sizeof(char));
-        int strikes = -1;
-        bool correctUserResponse = false;
-        while (!correctUserResponse)
-        {
-            strikes++;
-            if (strikes == 5)
-            {
-                printf("You failed, files deleted.");
-                return 0;
-            }
+        char *pastMessages = malloc(100 * sizeof(char));
+        pastMessages[0] = '\0'; // Initialize as empty string
 
-            printf("\033[31m%d/5 strikes\033[0m\nYour message: ", strikes);
-            fgets(convincingInput, 200, stdin);
-            if (convincingInput[strlen(convincingInput) - 1] != '\n')
-            {
-                clear_buffer();
-            }
+        int attempts = 0;
+        int globalConvincement = 0; // 0 to 100
+        printf("Now, convince me that your file \033[32m%s\033[0m should be returned to you.\n\033[41m[200 char limit per message]\033[0m\n", file);
 
-            correctUserResponse = true;
-            // Check against all existing rules
-            for (int i = 0; onlineRules[i] != NULL; i++)
-            {
-                // Need a generic "" to get anything returned for name
-                if (DEBUG)
-                    printf("\nRule %d: %s\nDoes it pass?\n", i + 1, onlineRules[i]("").name);
+        // ========================= GAME LOOP START =========================
+        while (globalConvincement < 100)
+        { // Initialize the memory structure for the response
 
-                Rule result = onlineRules[i](convincingInput);
-                if (result.valid == false)
+            printf("\n\033[47m\033[30m--- Attempt %d ---\033[0m\nConvincement: \033[32m%d/100\033[0m\n", ++attempts, globalConvincement);
+            if (onlineRuleCount > 0)
+            {
+                printf("Active Rules:\n");
+                for (int i = 0; i < onlineRuleCount; i++)
                 {
-                    correctUserResponse = false;
-                    char *prettyPrint = pretty_rule_print(result);
-                    printf("You broke %s\n", prettyPrint);
-                    free(prettyPrint);
+                    char *ruleDescription = pretty_rule_print(onlineRules[i](""));
+                    printf("%s\n", ruleDescription);
+                    free(ruleDescription);
+                }
+                printf("\n");
+            }
+
+            char *convincingInput;
+            convincingInput = (char *)malloc(200 * sizeof(char));
+            int strikes = -1;
+            bool correctUserResponse = false;
+            while (!correctUserResponse)
+            {
+                strikes++;
+                if (strikes == 0)
+                {
+                    printf("You can type \033[1mRESTART\033[0m to restart!\n");
+                }
+
+                if (strikes == 5)
+                {
+                    printf("You failed, files deleted.");
+                    return 0;
+                }
+
+                printf("\033[31m%d/5 strikes\033[0m\nYour message: ", strikes);
+                fgets(convincingInput, 200, stdin);
+                if (convincingInput[strlen(convincingInput) - 1] != '\n')
+                {
+                    clear_buffer();
+                }
+
+                correctUserResponse = true;
+                // Check against all existing rules
+                for (int i = 0; onlineRules[i] != NULL; i++)
+                {
+                    // Need a generic "" to get anything returned for name
+                    if (DEBUG)
+                        printf("\nRule %d: %s\nDoes it pass?\n", i + 1, onlineRules[i]("").name);
+
+                    Rule result = onlineRules[i](convincingInput);
+                    if (result.valid == false)
+                    {
+                        correctUserResponse = false;
+                        char *prettyPrint = pretty_rule_print(result);
+                        printf("You broke %s\n", prettyPrint);
+                        free(prettyPrint);
+                    }
+                }
+                if (correctUserResponse && strikes == 0)
+                {
+                    if (strcmp(convincingInput, "RESTART\n") == 0)
+                    {
+                        printf("Restarting program...\n");
+                        // TODO: restart program
+                        restart = true;
+                        break;
+                    }
                 }
             }
-        }
-
-        // ============== ITS POST REQUEST TIME ==============
-        struct memory chunk = {NULL, 0};
-        // Allocate initial memory for the response (just a pointer)
-        chunk.response = malloc(1);
-        if (chunk.response == NULL)
-        {
-            printf("Memory allocation failed\n");
-            return 1;
-        }
-        chunk.response[0] = 0; // Initialize as an empty null-terminated string
-
-        CURL *curl;
-        CURLM *multi;
-        CURLMcode res;
-
-        // The data you want to send in the POST request (JSON format)
-        // char *post_data = malloc(200 + strlen(convincingInput) + strlen(file) + strlen(pastMessages)); // Probably big enough
-        // sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"[Most recent messages first]: %s\"}", convincingInput, file, pastMessages);
-
-        cJSON *root = cJSON_CreateObject();
-        if (root == NULL)
-        {
-            // Handle error
-            printf("Failed to create JSON object, critical error\n");
-            return 109;
-        }
-        cJSON_AddStringToObject(root, "message", convincingInput);
-        cJSON_AddStringToObject(root, "fileName", file); // Assuming 'file' could also contain special chars
-        cJSON_AddStringToObject(root, "pastMessages", pastMessages);
-        char *post_data = cJSON_PrintUnformatted(root);
-
-        // Check for allocation failure
-        if (post_data == NULL)
-        {
-            // Handle error
-            cJSON_Delete(root);
-            return 110;
-        }
-
-        // Headers are needed to tell the server the data type being sent
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-        // You might also need an "Authorization" header for some APIs:
-        // headers = curl_slist_append(headers, "Authorization: Bearer YOUR_TOKEN");
-
-        curl = curl_easy_init();
-        multi = curl_multi_init();
-
-        if (!curl)
-        {
-            printf("CURL initialization failed\n");
-            free(chunk.response); // Clean up allocated memory
-            return 106;
-        }
-        curl_multi_add_handle(multi, curl);
-
-        // --- Configuration for the POST Request ---
-
-        // 1. Set the URL
-        curl_easy_setopt(curl, CURLOPT_URL, "https://dungewar.com/api/convince-game");
-
-        // 2. Set the request method to POST
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-        // 3. Set the data to be sent
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-
-        // Optional: Set the length of the data being sent
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(post_data));
-
-        // 4. Set the HTTP headers (Crucial for JSON data)
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        // --- Configuration for Capturing the Response ---
-
-        // 5. Tell libcurl to use our custom function to handle incoming data
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-
-        // 6. Pass the address of our 'chunk' structure to the callback function
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
-
-        // --- Perform the Request and Cleanup ---
-
-        // TODO: FIX
-        curl_multi_add_handle(multi, curl);
-        int still_running; /* keep number of running handles */
-        printf("Thinking..");
-        // long currentTime = time(NULL);
-        do
-        {
-            res = curl_multi_perform(multi, &still_running);
-
-            if (!res && still_running)
-                /* wait for activity, timeout or "nothing" */
-                res = curl_multi_poll(multi, NULL, 0, 1000, NULL);
-
-            if (res)
+            if (restart)
             {
-                fprintf(stderr, "curl_multi_poll() failed, code %d.\n", (int)res);
                 break;
             }
-            putchar('.');
-            fflush(stdout);
-            usleep(500000); // Sleep for 500 milliseconds
 
-        } while (still_running); /* if there are still transfers, loop */
-        printf("\033[1K");
-
-        if (res != CURLE_OK)
-        {
-            printf("CURL request failed: %s\n", curl_easy_strerror(res));
-        }
-        else
-        {
-            if (DEBUG)
+            // ============== ITS POST REQUEST TIME ==============
+            struct memory chunk = {NULL, 0};
+            // Allocate initial memory for the response (just a pointer)
+            chunk.response = malloc(1);
+            if (chunk.response == NULL)
             {
+                printf("Memory allocation failed\n");
+                return 1;
+            }
+            chunk.response[0] = 0; // Initialize as an empty null-terminated string
 
-                printf("\033[32mRequest successful\033[0m!\n");
-                printf("--------------------------------\n");
-                printf("Data Sent:\n%s\n", post_data);
-                printf("--------------------------------\n");
-                printf("Response received (Size: %zu bytes):\n%s\n", chunk.size, chunk.response);
-                printf("--------------------------------\n");
+            CURL *curl;
+            CURLM *multi;
+            CURLMcode res;
+
+            // The data you want to send in the POST request (JSON format)
+            // char *post_data = malloc(200 + strlen(convincingInput) + strlen(file) + strlen(pastMessages)); // Probably big enough
+            // sprintf(post_data, "{\"message\": \"%s\", \"fileName\": \"%s\", \"pastMessages\": \"[Most recent messages first]: %s\"}", convincingInput, file, pastMessages);
+
+            cJSON *root = cJSON_CreateObject();
+            if (root == NULL)
+            {
+                // Handle error
+                printf("Failed to create JSON object, critical error\n");
+                return 109;
+            }
+            cJSON_AddStringToObject(root, "message", convincingInput);
+            cJSON_AddStringToObject(root, "fileName", file); // Assuming 'file' could also contain special chars
+            cJSON_AddStringToObject(root, "pastMessages", pastMessages);
+            char *post_data = cJSON_PrintUnformatted(root);
+
+            // Check for allocation failure
+            if (post_data == NULL)
+            {
+                // Handle error
+                cJSON_Delete(root);
+                return 110;
             }
 
-            cJSON *json = cJSON_Parse(chunk.response);
-            if (json == NULL)
+            // Headers are needed to tell the server the data type being sent
+            struct curl_slist *headers = NULL;
+            headers = curl_slist_append(headers, "Content-Type: application/json");
+            // You might also need an "Authorization" header for some APIs:
+            // headers = curl_slist_append(headers, "Authorization: Bearer YOUR_TOKEN");
+
+            curl = curl_easy_init();
+            multi = curl_multi_init();
+
+            if (!curl)
             {
-                printf("Error parsing JSON response\n");
-                return 107;
+                printf("CURL initialization failed\n");
+                free(chunk.response); // Clean up allocated memory
+                return 106;
+            }
+            curl_multi_add_handle(multi, curl);
+
+            // --- Configuration for the POST Request ---
+
+            // 1. Set the URL
+            curl_easy_setopt(curl, CURLOPT_URL, "https://dungewar.com/api/convince-game");
+
+            // 2. Set the request method to POST
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+
+            // 3. Set the data to be sent
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+
+            // Optional: Set the length of the data being sent
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(post_data));
+
+            // 4. Set the HTTP headers (Crucial for JSON data)
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+            // --- Configuration for Capturing the Response ---
+
+            // 5. Tell libcurl to use our custom function to handle incoming data
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+
+            // 6. Pass the address of our 'chunk' structure to the callback function
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+            // --- Perform the Request and Cleanup ---
+
+            // TODO: FIX
+            curl_multi_add_handle(multi, curl);
+            int still_running; /* keep number of running handles */
+
+            long lastTime = time(NULL);
+            const int TIME_DELAY = 1; // in seconds
+            // random number from 17 to 208
+            const int START_COLOR = 17 + (rand() % (208 - 17 + 1));
+            int color = START_COLOR;
+            if (DEBUG)
+                printf("Starts with color: \033[38;5;%dm%d\033[0m\n", START_COLOR, START_COLOR);
+
+            printf("Thinking");
+            do
+            {
+                res = curl_multi_perform(multi, &still_running);
+
+                if (!res && still_running)
+                    /* wait for activity, timeout or "nothing" */
+                    res = curl_multi_poll(multi, NULL, 0, 1000, NULL);
+
+                if (res)
+                {
+                    fprintf(stderr, "curl_multi_poll() failed, code %d.\n", (int)res);
+                    break;
+                }
+                long currentTime = time(NULL);
+                if (currentTime - lastTime >= TIME_DELAY)
+                {
+                    lastTime = currentTime;
+                    // put("\033[3m");
+                    // putchar('.');
+
+                    printf("\033[38;5;%dm.\033[0m", color++);
+                    if (color > 231)
+                        color = 17;
+                    fflush(stdout);
+                }
+
+                // usleep(500000); // Sleep for 500 milliseconds
+
+            } while (still_running); /* if there are still transfers, loop */
+            printf("\033[1K");
+
+            if (res != CURLE_OK)
+            {
+                printf("CURL request failed: %s\n", curl_easy_strerror(res));
             }
             else
             {
-                cJSON *reply = cJSON_GetObjectItemCaseSensitive(json, "message");
-                cJSON *score = cJSON_GetObjectItemCaseSensitive(json, "convincement");
-                if (cJSON_IsString(reply) && (reply->valuestring != NULL) && cJSON_IsNumber(score) && (score->valueint > 0 && score->valueint <= 10))
+                if (DEBUG)
                 {
-                    char *response = malloc(strlen(reply->valuestring) + 50);
-                    sprintf(response, "\033[94m%s\033[0m\nScore: %d\n", reply->valuestring, score->valueint);
-                    slow_print(response);
-                    free(response);
 
-                    int scoreValue = score->valueint;
-                    globalConvincement += calculate_value(scoreValue);
-                    sprintf(pastMessages, "User: %s\nAI: %s\n", convincingInput, reply->valuestring);
+                    printf("\033[32mRequest successful\033[0m!\n");
+                    printf("--------------------------------\n");
+                    printf("Data Sent:\n%s\n", post_data);
+                    printf("--------------------------------\n");
+                    printf("Response received (Size: %zu bytes):\n%s\n", chunk.size, chunk.response);
+                    printf("--------------------------------\n");
+                }
+
+                cJSON *json = cJSON_Parse(chunk.response);
+                if (json == NULL)
+                {
+                    printf("Error parsing JSON response\n");
+                    return 107;
                 }
                 else
                 {
-                    printf("No valid 'reply' field in JSON response\n");
-                    return 108;
+                    cJSON *reply = cJSON_GetObjectItemCaseSensitive(json, "message");
+                    cJSON *score = cJSON_GetObjectItemCaseSensitive(json, "convincement");
+                    if (cJSON_IsString(reply) && (reply->valuestring != NULL) && cJSON_IsNumber(score) && (score->valueint > 0 && score->valueint <= 10))
+                    {
+                        char *response = malloc(strlen(reply->valuestring) + 50);
+                        sprintf(response, "\033[94m%s\033[0m\nScore: %d\n", reply->valuestring, score->valueint);
+                        slow_print(response);
+                        usleep(500);
+
+                        free(response);
+
+                        int scoreValue = score->valueint;
+                        globalConvincement += calculate_value(scoreValue);
+
+                        pastMessages = realloc(pastMessages, strlen(pastMessages) + strlen(convincingInput) + strlen(reply->valuestring) + 20);
+                        sprintf(pastMessages, "User: %s\nAI: %s\n", convincingInput, reply->valuestring);
+                    }
+                    else
+                    {
+                        printf("No valid 'reply' field in JSON response\n");
+                        return 108;
+                    }
+                    cJSON_Delete(json);
                 }
-                cJSON_Delete(json);
             }
-        }
 
-        // Clean up
-        free(convincingInput);
-        curl_easy_cleanup(curl);
+            // Clean up
+            free(convincingInput);
+            curl_easy_cleanup(curl);
 
-        curl_slist_free_all(headers); // Free the header list
-        free(chunk.response);         // Free the allocated response memory
-        cJSON_free(post_data);
-        cJSON_Delete(root);
+            curl_slist_free_all(headers); // Free the header list
+            free(chunk.response);         // Free the allocated response memory
+            cJSON_free(post_data);
+            cJSON_Delete(root);
 
-        // Add rules if pass thresholds
-        if ((globalConvincement > 20 && onlineRuleCount < 1) || (globalConvincement > 40 && onlineRuleCount < 2)) // Add new rule here
-        {
-            // May make it not random later
-            int index = rand() % (totalRuleCount - onlineRuleCount);
-            onlineRules[onlineRuleCount] = offlineRules[index];
-            onlineRules[onlineRuleCount + 1] = NULL;
-            onlineRuleCount++;
-            char *ruleDescription = pretty_rule_print(offlineRules[index](""));
-            printf("Added %s", ruleDescription);
-            free(ruleDescription);
-            // shift offline rules
-            for (int i = index; i < totalRuleCount - 1; i++)
+            // Add rules if pass thresholds
+            if ((globalConvincement > 20 && onlineRuleCount < 1) || (globalConvincement > 40 && onlineRuleCount < 2)) // Add new rule here
             {
-                offlineRules[i] = offlineRules[i + 1];
+                // May make it not random later
+                int index = rand() % (totalRuleCount - onlineRuleCount);
+                onlineRules[onlineRuleCount] = offlineRules[index];
+                onlineRules[onlineRuleCount + 1] = NULL;
+                onlineRuleCount++;
+                char *ruleDescription = pretty_rule_print(offlineRules[index](""));
+                printf("Added %s", ruleDescription);
+                free(ruleDescription);
+                // shift offline rules
+                for (int i = index; i < totalRuleCount - 1; i++)
+                {
+                    offlineRules[i] = offlineRules[i + 1];
+                }
+            }
+            else if ((globalConvincement < 20 && onlineRuleCount > 0) || (globalConvincement < 40 && onlineRuleCount > 1)) // Remove rule here
+            {
+
+                char *ruleDescription = pretty_rule_print(onlineRules[onlineRuleCount - 1](""));
+                printf("Removed %s", ruleDescription);
+                free(ruleDescription);
+                offlineRules[totalRuleCount - onlineRuleCount] = onlineRules[onlineRuleCount - 1];
+                onlineRules[onlineRuleCount - 1] = NULL;
+
+                onlineRuleCount--;
+                // int index = rand() % totalRuleCount - onlineRuleCount;
+                // onlineRules[index] = offlineRules[index];
             }
         }
-        else if ((globalConvincement < 20 && onlineRuleCount > 0) || (globalConvincement < 40 && onlineRuleCount > 1)) // Remove rule here
-        {
-
-            char *ruleDescription = pretty_rule_print(onlineRules[onlineRuleCount - 1](""));
-            printf("Removed %s", ruleDescription);
-            free(ruleDescription);
-            offlineRules[totalRuleCount - onlineRuleCount] = onlineRules[onlineRuleCount - 1];
-            onlineRules[onlineRuleCount - 1] = NULL;
-
-            onlineRuleCount--;
-            // int index = rand() % totalRuleCount - onlineRuleCount;
-            // onlineRules[index] = offlineRules[index];
-        }
-    }
+    } // ========================= GAME LOOP END =========================
     /*
     0. They decide the mode to play
     [easy] Normal game
